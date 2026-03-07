@@ -1101,6 +1101,7 @@ export class KanbanView extends ItemView {
       placeholder: "🔍  제목, 내용, 태그 검색...",
       cls: "kanban-search-input",
     });
+    searchInput.style.width = "100%";
     searchInput.style.marginBottom = "10px";
     searchInput.value = this.archiveSearch;
     searchInput.addEventListener("input", (e) => {
