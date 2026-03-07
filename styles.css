@@ -272,7 +272,10 @@
 }
 
 .kanban-tag-btn {
-  padding: 3px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
   border-radius: 20px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
@@ -282,6 +285,22 @@
   transition: all 0.12s ease;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.kanban-tag-btn-count {
+  background: var(--background-modifier-border);
+  border-radius: 20px;
+  padding: 0 5px;
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--text-faint);
+  min-width: 16px;
+  text-align: center;
+}
+
+.kanban-tag-btn.active .kanban-tag-btn-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
 }
 
 .kanban-tag-btn:hover {

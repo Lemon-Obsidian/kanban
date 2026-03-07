@@ -445,19 +445,25 @@ export class KanbanView extends ItemView {
 
     const bar = parent.createDiv("kanban-tag-filter-bar");
 
-    bar.createEl("button", {
-      text: "전체",
-      cls: `kanban-tag-btn${this.activeTagFilter === null ? " active" : ""}`,
-    }).addEventListener("click", () => { this.activeTagFilter = null; this.render(); });
+    // 태그별 카드 수 미리 계산
+    const tagCount = new Map<string, number>();
+    for (const card of this.cards) {
+      for (const tag of card.tags) tagCount.set(tag, (tagCount.get(tag) ?? 0) + 1);
+    }
+
+    const makeTagBtn = (label: string, count: number, active: boolean, onClick: () => void) => {
+      const btn = bar.createEl("button", { cls: `kanban-tag-btn${active ? " active" : ""}` });
+      btn.createSpan({ text: label });
+      btn.createSpan({ text: String(count), cls: "kanban-tag-btn-count" });
+      btn.addEventListener("click", onClick);
+    };
+
+    makeTagBtn("전체", this.cards.length, this.activeTagFilter === null,
+      () => { this.activeTagFilter = null; this.render(); });
 
     for (const tag of [...allTags].sort()) {
-      bar.createEl("button", {
-        text: `#${tag}`,
-        cls: `kanban-tag-btn${this.activeTagFilter === tag ? " active" : ""}`,
-      }).addEventListener("click", () => {
-        this.activeTagFilter = this.activeTagFilter === tag ? null : tag;
-        this.render();
-      });
+      makeTagBtn(`#${tag}`, tagCount.get(tag) ?? 0, this.activeTagFilter === tag,
+        () => { this.activeTagFilter = this.activeTagFilter === tag ? null : tag; this.render(); });
     }
   }
 
