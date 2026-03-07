@@ -90,6 +90,7 @@ export default class KanbanPlugin extends Plugin {
       ...DEFAULT_SETTINGS,
       ...saved,
       columns: saved?.columns ?? DEFAULT_SETTINGS.columns,
+      upcomingDays: saved?.upcomingDays ?? DEFAULT_SETTINGS.upcomingDays,
     };
   }
 
@@ -106,6 +107,7 @@ export default class KanbanPlugin extends Plugin {
 class KanbanSettingTab extends PluginSettingTab {
   private newColName = "";
   private newColFlushable = false;
+  private newDayValue = "";
 
   constructor(app: App, private plugin: KanbanPlugin) {
     super(app, plugin);
@@ -249,6 +251,64 @@ class KanbanSettingTab extends PluginSettingTab {
           .setValue(this.newColFlushable)
           .onChange((v) => (this.newColFlushable = v))
       );
+
+    // ── 마감 임박 설정 ──
+    containerEl.createEl("h3", { text: "마감 임박 설정" });
+    containerEl.createEl("p", {
+      text: "마감 임박 뷰에서 사용할 기간(일) 목록입니다. 각 값은 필터 버튼으로 표시됩니다.",
+      cls: "setting-item-description",
+    });
+
+    const days = this.plugin.settings.upcomingDays;
+    for (let i = 0; i < days.length; i++) {
+      new Setting(containerEl)
+        .setName(`${days[i]}일`)
+        .addButton((btn) =>
+          btn.setIcon("trash").setTooltip("삭제").onClick(async () => {
+            days.splice(i, 1);
+            await this.plugin.saveSettings();
+            this.plugin.refreshAllViews();
+            this.display();
+          })
+        );
+    }
+
+    containerEl.createEl("h4", { text: "기간 추가" });
+    new Setting(containerEl)
+      .setName("일 수")
+      .setDesc("양의 정수를 입력하세요 (예: 14)")
+      .addText((text) => {
+        text
+          .setPlaceholder("예: 14")
+          .setValue(this.newDayValue)
+          .onChange((v) => (this.newDayValue = v));
+        text.inputEl.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") this.addDay();
+        });
+      })
+      .addButton((btn) =>
+        btn.setButtonText("추가").setCta().onClick(() => this.addDay())
+      );
+  }
+
+  private async addDay() {
+    const n = parseInt(this.newDayValue.trim(), 10);
+    if (!n || n <= 0) {
+      new Notice("양의 정수를 입력하세요.");
+      return;
+    }
+    const days = this.plugin.settings.upcomingDays;
+    if (days.includes(n)) {
+      new Notice("이미 추가된 값입니다.");
+      return;
+    }
+    days.push(n);
+    days.sort((a, b) => a - b);
+    await this.plugin.saveSettings();
+    this.plugin.refreshAllViews();
+    this.newDayValue = "";
+    this.display();
+    new Notice(`${n}일이 추가되었습니다.`);
   }
 
   private async addColumn() {

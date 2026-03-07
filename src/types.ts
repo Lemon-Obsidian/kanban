@@ -23,6 +23,7 @@ export interface KanbanColumn {
 export interface KanbanSettings {
   boardFolder: string;
   columns: KanbanColumn[];
+  upcomingDays: number[];
 }
 
 export const DEFAULT_SETTINGS: KanbanSettings = {
@@ -32,4 +33,5 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
     { id: "doing", label: "IN PROGRESS", flushable: false },
     { id: "done",  label: "DONE",        flushable: true  },
   ],
+  upcomingDays: [1, 7, 30],
 };

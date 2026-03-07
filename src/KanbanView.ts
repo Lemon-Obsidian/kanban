@@ -143,6 +143,7 @@ export class KanbanView extends ItemView {
   private archiveMonthFilter: string | null = null;
   private archiveColumnFilter: string | null = null;
   private archiveTagFilter: string | null = null;
+  private upcomingDayFilter: number | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -614,6 +615,7 @@ export class KanbanView extends ItemView {
 
   private async switchToUpcoming() {
     this.viewMode = "upcoming";
+    this.upcomingDayFilter = null;
     this.cards = await this.fileManager.loadCards();
     this.render();
   }
@@ -630,24 +632,63 @@ export class KanbanView extends ItemView {
       .addEventListener("click", () => this.switchToBoard());
     titleRow.createEl("h2", { text: "📅 마감 임박", cls: "kanban-view-title" });
 
+    // 기간 필터 버튼
+    const configuredDays = this.settings.upcomingDays ?? [1, 7, 30];
+    const filterBar = header.createDiv("kanban-tag-filter-bar");
+    filterBar.createEl("button", {
+      text: "전체",
+      cls: `kanban-tag-btn${this.upcomingDayFilter === null ? " active" : ""}`,
+    }).addEventListener("click", () => { this.upcomingDayFilter = null; this.renderUpcoming(); });
+    for (const d of configuredDays) {
+      filterBar.createEl("button", {
+        text: `${d}일`,
+        cls: `kanban-tag-btn${this.upcomingDayFilter === d ? " active" : ""}`,
+      }).addEventListener("click", () => { this.upcomingDayFilter = d; this.renderUpcoming(); });
+    }
+
     const todayDate = new Date();
     todayDate.setHours(0, 0, 0, 0);
     const todayStr = todayDate.toISOString().split("T")[0];
-    const weekDate = new Date(todayDate); weekDate.setDate(weekDate.getDate() + 7);
-    const weekStr = weekDate.toISOString().split("T")[0];
-    const monthDate = new Date(todayDate); monthDate.setDate(monthDate.getDate() + 30);
-    const monthStr = monthDate.toISOString().split("T")[0];
+
+    // 필터 기준 상한일
+    let limitStr: string | null = null;
+    if (this.upcomingDayFilter !== null) {
+      const limitDate = new Date(todayDate);
+      limitDate.setDate(limitDate.getDate() + this.upcomingDayFilter);
+      limitStr = limitDate.toISOString().split("T")[0];
+    }
 
     const activeColumnIds = new Set(this.settings.columns.map((c) => c.id));
-    const cardsWithDue = this.cards.filter((c) => c.due && activeColumnIds.has(c.status));
+    let cardsWithDue = this.cards.filter((c) => c.due && activeColumnIds.has(c.status));
 
-    const groups = [
-      { key: "overdue", label: "기한 초과", cards: cardsWithDue.filter((c) => c.due! < todayStr) },
-      { key: "today",   label: "오늘",      cards: cardsWithDue.filter((c) => c.due === todayStr) },
-      { key: "week",    label: "이번 주 (7일 이내)",  cards: cardsWithDue.filter((c) => c.due! > todayStr && c.due! <= weekStr) },
-      { key: "month",   label: "이번 달 (30일 이내)", cards: cardsWithDue.filter((c) => c.due! > weekStr && c.due! <= monthStr) },
-      { key: "later",   label: "이후",      cards: cardsWithDue.filter((c) => c.due! > monthStr) },
-    ];
+    // 기간 필터 적용: 기한 초과는 항상 포함, 미래 카드는 limitStr 이내만
+    if (limitStr !== null) {
+      cardsWithDue = cardsWithDue.filter((c) => c.due! < todayStr || c.due! <= limitStr!);
+    }
+
+    // 그룹 분기: 선택된 필터에 맞춰 동적으로 구성
+    type Group = { key: string; label: string; cards: typeof cardsWithDue };
+    const groups: Group[] = [];
+    groups.push({ key: "overdue", label: "기한 초과", cards: cardsWithDue.filter((c) => c.due! < todayStr) });
+    groups.push({ key: "today",   label: "오늘",      cards: cardsWithDue.filter((c) => c.due === todayStr) });
+
+    if (limitStr === null) {
+      // 전체 모드: 7일/30일/이후 고정 구간
+      const weekDate = new Date(todayDate); weekDate.setDate(weekDate.getDate() + 7);
+      const weekStr = weekDate.toISOString().split("T")[0];
+      const monthDate = new Date(todayDate); monthDate.setDate(monthDate.getDate() + 30);
+      const monthStr = monthDate.toISOString().split("T")[0];
+      groups.push({ key: "week",  label: "7일 이내",  cards: cardsWithDue.filter((c) => c.due! > todayStr && c.due! <= weekStr) });
+      groups.push({ key: "month", label: "30일 이내", cards: cardsWithDue.filter((c) => c.due! > weekStr && c.due! <= monthStr) });
+      groups.push({ key: "later", label: "이후",      cards: cardsWithDue.filter((c) => c.due! > monthStr) });
+    } else {
+      // 필터 모드: 오늘 이후 ~ limitStr 단일 구간
+      groups.push({
+        key: "upcoming",
+        label: `${this.upcomingDayFilter}일 이내`,
+        cards: cardsWithDue.filter((c) => c.due! > todayStr && c.due! <= limitStr!),
+      });
+    }
 
     const content = containerEl.createDiv("kanban-list-content");
     let hasAny = false;
