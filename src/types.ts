@@ -4,6 +4,7 @@ export interface KanbanCard {
   due?: string;
   priority?: "low" | "medium" | "high" | "asap";
   created: string;
+  mtime?: number; // file modification time (ms)
   content: string;
   filePath: string;
   status: string; // column id

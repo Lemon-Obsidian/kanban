@@ -2,7 +2,7 @@ import { ItemView, Menu, Modal, Notice, Setting, WorkspaceLeaf } from "obsidian"
 import { ArchivedCard, KanbanBoard, KanbanCard, KanbanColumn, KanbanSettings } from "./types";
 import { FileManager } from "./FileManager";
 import { CardModal } from "./CardModal";
-import { slugify, parseChecklist, formatChecklist, priorityToNum } from "./utils";
+import { slugify, parseChecklist, formatChecklist, priorityToNum, relativeTime } from "./utils";
 
 export const VIEW_TYPE_KANBAN = "kanban-board-view";
 
@@ -786,6 +786,15 @@ export class KanbanView extends ItemView {
           this.render();
         });
       }
+    }
+
+    // 날짜 footer (생성일 · 수정일)
+    const footerEl = cardEl.createDiv("kanban-card-footer");
+    const createdMs = new Date(card.created).getTime();
+    footerEl.createSpan({ text: `생성 ${relativeTime(createdMs)}`, cls: "kanban-card-date" });
+    if (card.mtime && Math.abs(card.mtime - createdMs) > 60_000) {
+      footerEl.createSpan({ text: "·", cls: "kanban-card-date-sep" });
+      footerEl.createSpan({ text: `수정 ${relativeTime(card.mtime)}`, cls: "kanban-card-date" });
     }
 
     // 우클릭 컨텍스트 메뉴

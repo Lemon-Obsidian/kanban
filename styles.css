@@ -732,6 +732,27 @@
   background: rgba(231, 76, 60, 0.1) !important;
 }
 
+/* ── 카드 날짜 footer ────────────────────────────────────── */
+
+.kanban-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.kanban-card-date {
+  font-size: 0.68em;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
+.kanban-card-date-sep {
+  font-size: 0.68em;
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
 /* ── 퀵 추가 입력 ────────────────────────────────────────── */
 
 .kanban-quick-add {

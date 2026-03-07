@@ -120,7 +120,9 @@ export class FileManager {
       for (const child of folder.children) {
         if (!(child instanceof TFile) || child.extension !== "md") continue;
         const raw = await this.app.vault.read(child);
-        cards.push(this.parseFileContent(child.path, raw, id));
+        const card = this.parseFileContent(child.path, raw, id);
+        card.mtime = child.stat.mtime;
+        cards.push(card);
       }
     }
 
