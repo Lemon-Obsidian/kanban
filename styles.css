@@ -753,6 +753,37 @@
   opacity: 0.5;
 }
 
+/* ── 보드 통계 바 ────────────────────────────────────────── */
+
+.kanban-stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 2px 6px;
+}
+
+.kanban-stat-item {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 0.78em;
+  color: var(--text-muted);
+}
+
+.kanban-stat-value {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.kanban-stat-item.kanban-stat-overdue .kanban-stat-value {
+  color: #e74c3c;
+}
+
+.kanban-stat-item.kanban-stat-overdue .kanban-stat-label {
+  color: #e74c3c;
+  opacity: 0.85;
+}
+
 /* ── 내부 링크 ───────────────────────────────────────────── */
 
 .kanban-internal-link {

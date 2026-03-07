@@ -254,6 +254,7 @@ export class KanbanView extends ItemView {
   private sortBy: SortBy = "created";
   private sortDir: "asc" | "desc" = "desc";
   private boardColumnsEl: HTMLElement | null = null;
+  private statsBarEl: HTMLElement | null = null;
 
   private draggedColumnId: string | null = null;
   private viewMode: ViewMode = "board";
@@ -408,6 +409,8 @@ export class KanbanView extends ItemView {
 
     this.renderTagFilterBar(header);
 
+    this.statsBarEl = header.createDiv("kanban-stats-bar");
+
     this.boardColumnsEl = containerEl.createDiv("kanban-board");
     this.renderBoardColumns();
   }
@@ -415,6 +418,25 @@ export class KanbanView extends ItemView {
   private renderBoardColumns() {
     if (!this.boardColumnsEl) return;
     this.boardColumnsEl.empty();
+
+    // 통계 바 업데이트
+    if (this.statsBarEl) {
+      this.statsBarEl.empty();
+      const today = new Date().toISOString().split("T")[0];
+      const doneColIds = new Set(this.activeBoard.columns.filter((c) => c.flushable).map((c) => c.id));
+      const total = this.cards.length;
+      const done = this.cards.filter((c) => doneColIds.has(c.status)).length;
+      const overdue = this.cards.filter((c) => c.due && c.due < today && !doneColIds.has(c.status)).length;
+
+      const stat = (label: string, value: number, cls?: string) => {
+        const el = this.statsBarEl!.createSpan({ cls: `kanban-stat-item${cls ? " " + cls : ""}` });
+        el.createSpan({ text: String(value), cls: "kanban-stat-value" });
+        el.createSpan({ text: " " + label, cls: "kanban-stat-label" });
+      };
+      stat("전체", total);
+      stat("완료", done);
+      if (overdue > 0) stat("기한 초과", overdue, "kanban-stat-overdue");
+    }
 
     for (const col of this.activeBoard.columns) {
       this.renderColumn(this.boardColumnsEl, col.id, col.label, col.flushable ?? false);
