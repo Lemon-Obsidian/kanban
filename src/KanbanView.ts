@@ -1,5 +1,5 @@
 import { ItemView, Menu, Modal, Notice, Setting, WorkspaceLeaf } from "obsidian";
-import { ArchivedCard, KanbanCard, KanbanColumn, KanbanSettings } from "./types";
+import { ArchivedCard, KanbanBoard, KanbanCard, KanbanColumn, KanbanSettings } from "./types";
 import { FileManager } from "./FileManager";
 import { CardModal } from "./CardModal";
 import { slugify, parseChecklist, formatChecklist, priorityToNum } from "./utils";
@@ -90,6 +90,83 @@ class AddColumnModal extends Modal {
     }
 
     this.onAdd({ id, label: name, flushable: this.flushable });
+    this.close();
+  }
+
+  onClose() { this.contentEl.empty(); }
+}
+
+// ── AddBoardModal ─────────────────────────────────────────────────────────
+
+class AddBoardModal extends Modal {
+  private name = "";
+  private folder = "";
+
+  constructor(
+    app: Parameters<typeof Modal["prototype"]["constructor"]>[0],
+    private existingIds: string[],
+    private onAdd: (board: KanbanBoard) => void
+  ) {
+    super(app);
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "새 보드 만들기" });
+
+    let nameInput: HTMLInputElement;
+    new Setting(contentEl).setName("보드 이름").addText((text) => {
+      text.setPlaceholder("예: 개인 프로젝트").onChange((v) => {
+        this.name = v;
+        if (!this.folder) {
+          folderInput.value = slugify(v) || "";
+          this.folder = folderInput.value;
+        }
+      });
+      nameInput = text.inputEl;
+    });
+
+    let folderInput: HTMLInputElement;
+    new Setting(contentEl)
+      .setName("폴더 경로")
+      .setDesc("보드 카드가 저장될 Vault 내 폴더 경로")
+      .addText((text) => {
+        text.setPlaceholder("예: Projects/Personal").onChange((v) => (this.folder = v));
+        folderInput = text.inputEl;
+      });
+
+    const btnRow = contentEl.createDiv("kanban-modal-buttons");
+    btnRow.createEl("button", { text: "취소" }).addEventListener("click", () => this.close());
+    btnRow.createEl("button", { text: "만들기", cls: "mod-cta" })
+      .addEventListener("click", () => this.submit());
+
+    setTimeout(() => nameInput?.focus(), 50);
+    contentEl.addEventListener("keydown", (e) => { if (e.key === "Enter") this.submit(); });
+  }
+
+  private submit() {
+    const name = this.name.trim();
+    const folder = this.folder.trim();
+    if (!name) { new Notice("보드 이름을 입력하세요."); return; }
+    if (!folder) { new Notice("폴더 경로를 입력하세요."); return; }
+
+    let id = slugify(name) || `board-${Date.now()}`;
+    if (this.existingIds.includes(id)) {
+      let n = 2;
+      while (this.existingIds.includes(`${id}-${n}`)) n++;
+      id = `${id}-${n}`;
+    }
+
+    this.onAdd({
+      id,
+      name,
+      folder,
+      columns: [
+        { id: "todo",  label: "TO-DO",       flushable: false },
+        { id: "doing", label: "IN PROGRESS", flushable: false },
+        { id: "done",  label: "DONE",        flushable: true  },
+      ],
+    });
     this.close();
   }
 
@@ -196,6 +273,11 @@ export class KanbanView extends ItemView {
     super(leaf);
   }
 
+  private get activeBoard() {
+    return this.settings.boards.find((b) => b.id === this.settings.activeBoardId)
+      ?? this.settings.boards[0];
+  }
+
   getViewType() { return VIEW_TYPE_KANBAN; }
   getDisplayText() { return "Kanban Board"; }
   getIcon() { return "columns"; }
@@ -228,7 +310,39 @@ export class KanbanView extends ItemView {
     const header = containerEl.createDiv("kanban-header");
 
     const titleRow = header.createDiv("kanban-header-title-row");
-    titleRow.createEl("h1", { text: "Kanban Board", cls: "kanban-title" });
+
+    // 보드 선택 드롭다운
+    const boardSwitcher = titleRow.createDiv("kanban-board-switcher");
+    const boardSelect = boardSwitcher.createEl("select", { cls: "kanban-board-select" });
+    for (const board of this.settings.boards) {
+      const opt = boardSelect.createEl("option", { text: board.name, value: board.id });
+      if (board.id === this.activeBoard.id) opt.selected = true;
+    }
+    boardSelect.addEventListener("change", async () => {
+      await this.switchBoard(boardSelect.value);
+    });
+
+    boardSwitcher.createEl("button", {
+      text: "+",
+      cls: "kanban-board-add-btn",
+      title: "새 보드 만들기",
+    }).addEventListener("click", () => {
+      new AddBoardModal(
+        this.app,
+        this.settings.boards.map((b) => b.id),
+        async (newBoard) => {
+          this.settings.boards.push(newBoard);
+          this.settings.activeBoardId = newBoard.id;
+          this.fileManager.setBoard(newBoard);
+          await this.saveSettings();
+          await this.fileManager.ensureFolders();
+          this.boardSearch = "";
+          this.activeTagFilter = null;
+          await this.refresh();
+          new Notice(`"${newBoard.name}" 보드가 생성되었습니다.`);
+        }
+      ).open();
+    });
 
     const headerBtns = titleRow.createDiv("kanban-header-btns");
     headerBtns.createEl("button", {
@@ -302,7 +416,7 @@ export class KanbanView extends ItemView {
     if (!this.boardColumnsEl) return;
     this.boardColumnsEl.empty();
 
-    for (const col of this.settings.columns) {
+    for (const col of this.activeBoard.columns) {
       this.renderColumn(this.boardColumnsEl, col.id, col.label, col.flushable ?? false);
     }
 
@@ -312,9 +426,9 @@ export class KanbanView extends ItemView {
     addColPlaceholder.addEventListener("click", () => {
       new AddColumnModal(
         this.app,
-        this.settings.columns.map((c) => c.id),
+        this.activeBoard.columns.map((c) => c.id),
         async (newCol) => {
-          this.settings.columns.push(newCol);
+          this.activeBoard.columns.push(newCol);
           await this.saveSettings();
           await this.fileManager.ensureFolders();
           await this.refresh();
@@ -379,11 +493,11 @@ export class KanbanView extends ItemView {
       e.preventDefault();
       col.removeClass("col-drag-over");
       const fromId = this.draggedColumnId;
-      const fromIdx = this.settings.columns.findIndex((c) => c.id === fromId);
-      const toIdx = this.settings.columns.findIndex((c) => c.id === columnId);
+      const fromIdx = this.activeBoard.columns.findIndex((c) => c.id === fromId);
+      const toIdx = this.activeBoard.columns.findIndex((c) => c.id === columnId);
       if (fromIdx !== -1 && toIdx !== -1) {
-        const [removed] = this.settings.columns.splice(fromIdx, 1);
-        this.settings.columns.splice(toIdx, 0, removed);
+        const [removed] = this.activeBoard.columns.splice(fromIdx, 1);
+        this.activeBoard.columns.splice(toIdx, 0, removed);
         await this.saveSettings();
         await this.refresh();
       }
@@ -423,10 +537,10 @@ export class KanbanView extends ItemView {
       menu.addItem((item) =>
         item.setTitle("컬럼명 수정").setIcon("pencil").onClick(() => {
           new RenameColumnModal(this.app, label, async (newLabel) => {
-            const col = this.settings.columns.find((c) => c.id === columnId);
+            const col = this.activeBoard.columns.find((c) => c.id === columnId);
             if (!col) return;
             const newId = slugify(newLabel) || columnId;
-            const idConflict = newId !== columnId && this.settings.columns.some((c) => c.id === newId);
+            const idConflict = newId !== columnId && this.activeBoard.columns.some((c) => c.id === newId);
             if (idConflict) {
               new Notice(`"${newId}" 폴더가 이미 존재합니다. 다른 이름을 사용하세요.`);
               return;
@@ -443,7 +557,7 @@ export class KanbanView extends ItemView {
       menu.addSeparator();
       menu.addItem((item) =>
         item.setTitle("컬럼 삭제").setIcon("trash").onClick(async () => {
-          if (this.settings.columns.length <= 1) {
+          if (this.activeBoard.columns.length <= 1) {
             new Notice("최소 1개의 컬럼이 필요합니다.");
             return;
           }
@@ -458,7 +572,7 @@ export class KanbanView extends ItemView {
             danger: true,
             onConfirm: async () => {
               await this.fileManager.deleteColumn(columnId);
-              this.settings.columns = this.settings.columns.filter((c) => c.id !== columnId);
+              this.activeBoard.columns = this.activeBoard.columns.filter((c) => c.id !== columnId);
               await this.saveSettings();
               await this.refresh();
               new Notice(`"${label}" 컬럼이 삭제되었습니다.`);
@@ -660,7 +774,7 @@ export class KanbanView extends ItemView {
         item.setTitle("편집").setIcon("pencil").onClick(() => this.openEditModal(card))
       );
       menu.addSeparator();
-      for (const col of this.settings.columns) {
+      for (const col of this.activeBoard.columns) {
         if (col.id === card.status) continue;
         menu.addItem((item) =>
           item.setTitle(`${col.label}(으)로 이동`).setIcon("arrow-right")
@@ -766,7 +880,7 @@ export class KanbanView extends ItemView {
       limitStr = limitDate.toISOString().split("T")[0];
     }
 
-    const activeColumnIds = new Set(this.settings.columns.map((c) => c.id));
+    const activeColumnIds = new Set(this.activeBoard.columns.map((c) => c.id));
     let cardsWithDue = this.cards.filter((c) => c.due && activeColumnIds.has(c.status));
 
     // 기간 필터 적용: 기한 초과는 항상 포함, 미래 카드는 limitStr 이내만
@@ -835,6 +949,18 @@ export class KanbanView extends ItemView {
     this.render();
   }
 
+  private async switchBoard(boardId: string) {
+    const board = this.settings.boards.find((b) => b.id === boardId);
+    if (!board) return;
+    this.settings.activeBoardId = boardId;
+    this.fileManager.setBoard(board);
+    this.boardSearch = "";
+    this.activeTagFilter = null;
+    this.viewMode = "board";
+    await this.saveSettings();
+    await this.refresh();
+  }
+
   private renderArchive() {
     const { containerEl } = this;
     containerEl.empty();
@@ -865,7 +991,7 @@ export class KanbanView extends ItemView {
       (m) => this.formatMonth(m));
     this.renderArchiveFilterRow(filterBar, "컬럼", this.getArchiveColumns(), this.archiveColumnFilter,
       (v) => { this.archiveColumnFilter = v; this.renderArchiveContent(content); },
-      (id) => this.settings.columns.find((c) => c.id === id)?.label ?? id);
+      (id) => this.activeBoard.columns.find((c) => c.id === id)?.label ?? id);
     this.renderArchiveFilterRow(filterBar, "태그", this.getArchiveTags(), this.archiveTagFilter,
       (v) => { this.archiveTagFilter = v; this.renderArchiveContent(content); },
       (t) => `#${t}`);
@@ -917,7 +1043,7 @@ export class KanbanView extends ItemView {
   private renderListCard(parent: HTMLElement, card: KanbanCard, flushedAt?: string) {
     const flushedFrom = (card as ArchivedCard).flushedFrom;
     const colId = flushedFrom ?? card.status;
-    const colLabel = this.settings.columns.find((c) => c.id === colId)?.label ?? colId;
+    const colLabel = this.activeBoard.columns.find((c) => c.id === colId)?.label ?? colId;
     const priorityColor: Record<string, string> = { low: "#3498db", high: "#f39c12", asap: "#e74c3c" };
 
     const cardEl = parent.createDiv("kanban-list-card");

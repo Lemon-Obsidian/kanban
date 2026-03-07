@@ -6,18 +6,22 @@ import {
   parseYaml,
   stringifyYaml,
 } from "obsidian";
-import { ArchivedCard, KanbanCard, KanbanSettings } from "./types";
+import { ArchivedCard, KanbanBoard, KanbanCard } from "./types";
 import { slugify } from "./utils";
 
 export class FileManager {
-  constructor(private app: App, private settings: KanbanSettings) {}
+  constructor(private app: App, private board: KanbanBoard) {}
+
+  setBoard(board: KanbanBoard) {
+    this.board = board;
+  }
 
   private getColumnPath(columnId: string): string {
-    return normalizePath(`${this.settings.boardFolder}/${columnId}`);
+    return normalizePath(`${this.board.folder}/${columnId}`);
   }
 
   private getArchiveBasePath(): string {
-    return normalizePath(`${this.settings.boardFolder}/_archive`);
+    return normalizePath(`${this.board.folder}/_archive`);
   }
 
   private getArchiveMonthPath(date: Date): string {
@@ -27,8 +31,8 @@ export class FileManager {
 
   async ensureFolders(): Promise<void> {
     const paths = [
-      this.settings.boardFolder,
-      ...this.settings.columns.map((c) => `${this.settings.boardFolder}/${c.id}`),
+      this.board.folder,
+      ...this.board.columns.map((c) => `${this.board.folder}/${c.id}`),
     ];
     for (const p of paths) {
       const normalized = normalizePath(p);
@@ -104,7 +108,7 @@ export class FileManager {
   async loadCards(columnId?: string): Promise<KanbanCard[]> {
     const ids = columnId
       ? [columnId]
-      : this.settings.columns.map((c) => c.id);
+      : this.board.columns.map((c) => c.id);
     const cards: KanbanCard[] = [];
 
     for (const id of ids) {
@@ -179,7 +183,7 @@ export class FileManager {
   async renameColumn(oldId: string, newId: string): Promise<void> {
     if (oldId === newId) return;
     const oldPath = this.getColumnPath(oldId);
-    const newPath = normalizePath(`${this.settings.boardFolder}/${newId}`);
+    const newPath = normalizePath(`${this.board.folder}/${newId}`);
     const folder = this.app.vault.getAbstractFileByPath(oldPath);
     if (folder instanceof TFolder) {
       await this.app.vault.rename(folder, newPath);

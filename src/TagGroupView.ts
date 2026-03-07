@@ -57,7 +57,8 @@ export class TagGroupView extends ItemView {
       this.render();
     });
 
-    for (const col of this.settings.columns) {
+    const activeBoard = this.settings.boards.find((b) => b.id === this.settings.activeBoardId) ?? this.settings.boards[0];
+    for (const col of activeBoard.columns) {
       const btn = filterRow.createEl("button", {
         text: col.label,
         cls: `kanban-status-btn ${this.statusFilter === col.id ? "active" : ""}`,
@@ -139,7 +140,7 @@ export class TagGroupView extends ItemView {
 
     // Column id → label 맵
     const columnLabel = Object.fromEntries(
-      this.settings.columns.map((c) => [c.id, c.label])
+      (this.settings.boards.find((b) => b.id === this.settings.activeBoardId) ?? this.settings.boards[0]).columns.map((c) => [c.id, c.label])
     );
     const priorityIcon: Record<string, string> = {
       low: "🔵",
