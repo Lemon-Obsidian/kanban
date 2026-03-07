@@ -163,7 +163,7 @@ class AddBoardModal extends Modal {
       folder,
       columns: [
         { id: "todo",  label: "TO-DO",       flushable: false },
-        { id: "doing", label: "IN PROGRESS", flushable: false },
+        { id: "in-progress", label: "IN PROGRESS", flushable: false },
         { id: "done",  label: "DONE",        flushable: true  },
       ],
     });
