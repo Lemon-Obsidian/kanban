@@ -1,5 +1,5 @@
 import { ItemView, Menu, Modal, Notice, Setting, WorkspaceLeaf } from "obsidian";
-import { ArchivedCard, KanbanBoard, KanbanCard, KanbanColumn, KanbanSettings } from "./types";
+import { ArchivedCard, KanbanBoard, KanbanCard, KanbanColumn, KanbanSettings, RecurringTask } from "./types";
 import { FileManager } from "./FileManager";
 import { CardModal } from "./CardModal";
 import { slugify, parseChecklist, formatChecklist, priorityToNum, relativeTime } from "./utils";
@@ -288,7 +288,7 @@ export class KanbanView extends ItemView {
 
   async onOpen() {
     await this.refresh();
-    await this.checkRecurringCards();
+    await this.checkRecurringTasks();
     this.registerDomEvent(this.containerEl, "keydown", (e: KeyboardEvent) => this.handleKeydown(e));
   }
 
@@ -373,6 +373,12 @@ export class KanbanView extends ItemView {
       cls: "kanban-header-btn",
       title: "아카이브 히스토리 보기",
     }).addEventListener("click", () => this.switchToArchive());
+
+    headerBtns.createEl("button", {
+      text: "🔁 반복 관리",
+      cls: "kanban-header-btn",
+      title: "반복 작업 관리",
+    }).addEventListener("click", () => this.openRecurringTasksModal());
 
     // 검색 + 정렬
     const controlsRow = header.createDiv("kanban-controls-row");
@@ -920,74 +926,15 @@ export class KanbanView extends ItemView {
 
   private async moveCard(card: KanbanCard, newColumnId: string) {
     await this.fileManager.moveCard(card, newColumnId);
-
-    // 반복 카드: flushable 컬럼으로 이동 시 첫 번째 non-flushable 컬럼에 새 카드 생성
-    if (card.recur) {
-      const targetCol = this.activeBoard.columns.find((c) => c.id === newColumnId);
-      if (targetCol?.flushable) {
-        const firstCol = this.activeBoard.columns.find((c) => !c.flushable);
-        if (firstCol) {
-          await this.fileManager.createCard({
-            title: card.title,
-            tags: card.tags,
-            due: this.nextDueDate(card.due, card.recur),
-            priority: card.priority,
-            recur: card.recur,
-            created: new Date().toISOString(),
-            content: card.content,
-            status: firstCol.id,
-          });
-          new Notice(`🔁 반복 카드가 "${firstCol.label}"에 생성되었습니다.`);
-        }
-      }
-    }
-
     await this.refresh();
-  }
-
-  private nextDueDate(due: string | undefined, recur: string): string | undefined {
-    if (!due) return undefined;
-    const d = new Date(due);
-    if (recur === "daily") d.setDate(d.getDate() + 1);
-    else if (recur === "weekly") d.setDate(d.getDate() + 7);
-    else if (recur === "monthly") d.setMonth(d.getMonth() + 1);
-    return d.toISOString().split("T")[0];
   }
 
   private openFlushModal(columnId: string, label: string, count: number) {
     new FlushConfirmModal(this.app, label, count, async () => {
-      // flush 전에 반복 카드의 다음 인스턴스를 먼저 생성
-      await this.spawnRecurNextForColumn(columnId);
       const flushed = await this.fileManager.flushColumn(columnId);
       new Notice(`${flushed}개의 카드가 아카이브에 보관되었습니다.`);
       await this.refresh();
     }).open();
-  }
-
-  // flush될 컬럼의 반복 카드 중 아직 다음 인스턴스가 없는 것만 생성
-  private async spawnRecurNextForColumn(columnId: string) {
-    const firstCol = this.activeBoard.columns.find((c) => !c.flushable);
-    if (!firstCol) return;
-
-    const activeRecurTitles = new Set(
-      this.cards.filter((c) => c.recur && !this.activeBoard.columns.find((col) => col.id === c.status)?.flushable)
-        .map((c) => c.title)
-    );
-
-    const toSpawn = this.cards.filter((c) => c.status === columnId && c.recur);
-    for (const card of toSpawn) {
-      if (activeRecurTitles.has(card.title)) continue;
-      await this.fileManager.createCard({
-        title: card.title,
-        tags: card.tags,
-        due: this.nextDueDate(card.due, card.recur!),
-        priority: card.priority,
-        recur: card.recur,
-        created: new Date().toISOString(),
-        content: card.content,
-        status: firstCol.id,
-      });
-    }
   }
 
   // ── 마감 임박 뷰 ──────────────────────────────────────────────────────────
@@ -1258,44 +1205,74 @@ export class KanbanView extends ItemView {
     });
   }
 
-  // ── 반복 카드 자동 생성 ───────────────────────────────────────────────────
+  // ── 반복 작업 스케줄러 ────────────────────────────────────────────────────
+  //
+  // 동작 방식:
+  //   - Kanban 뷰가 열릴 때 실행
+  //   - 현재 보드의 반복 작업 정의(settings.recurringTasks)를 순회
+  //   - 각 작업의 lastCreated와 현재 시각을 비교해 interval이 지났으면 카드 생성
+  //   - 이전 카드 완료 여부, DONE 컬럼 상태 등과 무관하게 시간 기반으로만 판단
+  //   - 몇 주를 안 열어도 1개만 생성 (누락 인스턴스 누적 없음)
 
-  // Kanban 뷰가 열릴 때 실행.
-  // flushable 컬럼(DONE 등)에 반복 카드가 있는데 활성 컬럼에 다음 인스턴스가 없으면 생성.
-  // (moveCard 트리거가 실행되지 않은 경우 — 파일 직접 이동, 플러그인 재시작 등)
-  private async checkRecurringCards() {
-    const flushableIds = new Set(
-      this.activeBoard.columns.filter((c) => c.flushable).map((c) => c.id)
+  private async checkRecurringTasks() {
+    const tasks = this.settings.recurringTasks.filter(
+      (t) => t.boardId === this.activeBoard.id
     );
-    const firstCol = this.activeBoard.columns.find((c) => !c.flushable);
-    if (!firstCol) return;
+    if (tasks.length === 0) return;
 
-    // 활성(non-flushable) 컬럼에 있는 반복 카드 제목 목록
-    const activeRecurTitles = new Set(
-      this.cards.filter((c) => c.recur && !flushableIds.has(c.status)).map((c) => c.title)
-    );
+    const now = new Date();
+    let created = 0;
 
-    // flushable 컬럼에 있는 반복 카드 중 활성에 동일 제목이 없는 것만 생성
-    const toSpawn = this.cards.filter((c) => c.recur && flushableIds.has(c.status)
-      && !activeRecurTitles.has(c.title));
+    for (const task of tasks) {
+      if (!this.isRecurTaskDue(task, now)) continue;
 
-    if (toSpawn.length === 0) return;
+      const targetCol =
+        this.activeBoard.columns.find((c) => c.id === task.targetColumnId) ??
+        this.activeBoard.columns.find((c) => !c.flushable);
+      if (!targetCol) continue;
 
-    for (const card of toSpawn) {
       await this.fileManager.createCard({
-        title: card.title,
-        tags: card.tags,
-        due: this.nextDueDate(card.due, card.recur!),
-        priority: card.priority,
-        recur: card.recur,
-        created: new Date().toISOString(),
-        content: card.content,
-        status: firstCol.id,
+        title: task.title,
+        tags: task.tags,
+        priority: undefined,
+        due: undefined,
+        recur: task.recur,
+        created: now.toISOString(),
+        content: "",
+        status: targetCol.id,
       });
+
+      task.lastCreated = now.toISOString();
+      created++;
     }
 
-    new Notice(`🔁 반복 카드 ${toSpawn.length}개가 TO-DO에 생성되었습니다.`);
-    await this.refresh();
+    if (created > 0) {
+      await this.saveSettings();
+      new Notice(`🔁 반복 작업 ${created}개가 자동 생성되었습니다.`);
+      await this.refresh();
+    }
+  }
+
+  private isRecurTaskDue(task: RecurringTask, now: Date): boolean {
+    if (!task.lastCreated) return true; // 한 번도 생성된 적 없으면 즉시 생성
+    const last = new Date(task.lastCreated);
+    const diffDays = (now.getTime() - last.getTime()) / 86_400_000;
+    if (task.recur === "daily")   return diffDays >= 1;
+    if (task.recur === "weekly")  return diffDays >= 7;
+    if (task.recur === "monthly") return diffDays >= 30;
+    return false;
+  }
+
+  private openRecurringTasksModal() {
+    new RecurringTasksModal(
+      this.app,
+      this.settings,
+      this.activeBoard,
+      async () => {
+        await this.saveSettings();
+        await this.refresh();
+      }
+    ).open();
   }
 
   // ── 키보드 단축키 ─────────────────────────────────────────────────────────
@@ -1529,4 +1506,119 @@ export class KanbanView extends ItemView {
   }
 
   async onClose() { this.containerEl.empty(); }
+}
+
+// ── RecurringTasksModal ───────────────────────────────────────────────────
+
+class RecurringTasksModal extends Modal {
+  constructor(
+    app: App,
+    private settings: KanbanSettings,
+    private board: KanbanBoard,
+    private onSave: () => Promise<void>
+  ) {
+    super(app);
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("kanban-recurring-modal");
+    this.render();
+  }
+
+  private render() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "🔁 반복 작업 관리" });
+    contentEl.createEl("p", {
+      text: "Kanban 뷰를 열 때 설정한 주기가 지나면 카드를 자동으로 생성합니다.",
+      cls: "kanban-recurring-desc",
+    });
+
+    const tasks = this.settings.recurringTasks.filter((t) => t.boardId === this.board.id);
+
+    if (tasks.length === 0) {
+      contentEl.createDiv({ text: "등록된 반복 작업이 없습니다.", cls: "kanban-recurring-empty" });
+    } else {
+      const list = contentEl.createDiv("kanban-recurring-list");
+      for (const task of tasks) {
+        const row = list.createDiv("kanban-recurring-row");
+
+        const info = row.createDiv("kanban-recurring-info");
+        info.createDiv({ text: task.title, cls: "kanban-recurring-title" });
+
+        const recurLabel: Record<string, string> = { daily: "매일", weekly: "매주", monthly: "매월" };
+        const targetCol = this.board.columns.find((c) => c.id === task.targetColumnId)?.label ?? task.targetColumnId;
+        const lastStr = task.lastCreated
+          ? new Date(task.lastCreated).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
+          : "아직 생성 안 됨";
+
+        info.createDiv({
+          text: `${recurLabel[task.recur]} · ${targetCol} · 마지막 생성: ${lastStr}`,
+          cls: "kanban-recurring-meta",
+        });
+
+        const delBtn = row.createEl("button", { text: "삭제", cls: "kanban-recurring-del-btn mod-warning" });
+        delBtn.addEventListener("click", async () => {
+          this.settings.recurringTasks = this.settings.recurringTasks.filter((t) => t.id !== task.id);
+          await this.onSave();
+          this.render();
+        });
+      }
+    }
+
+    contentEl.createEl("hr");
+
+    // 새 작업 추가 폼
+    contentEl.createEl("h3", { text: "새 반복 작업 추가" });
+
+    let newTitle = "";
+    let newRecur: RecurringTask["recur"] = "weekly";
+    let newTargetCol = this.board.columns.find((c) => !c.flushable)?.id ?? this.board.columns[0]?.id ?? "";
+
+    new Setting(contentEl)
+      .setName("작업 제목 *")
+      .addText((t) => {
+        t.setPlaceholder("예: 주간보고 작성").onChange((v) => (newTitle = v));
+        t.inputEl.style.width = "100%";
+      });
+
+    new Setting(contentEl)
+      .setName("반복 주기")
+      .addDropdown((dd) => {
+        dd.addOption("daily", "매일");
+        dd.addOption("weekly", "매주");
+        dd.addOption("monthly", "매월");
+        dd.setValue(newRecur);
+        dd.onChange((v) => (newRecur = v as RecurringTask["recur"]));
+      });
+
+    new Setting(contentEl)
+      .setName("생성 컬럼")
+      .addDropdown((dd) => {
+        for (const col of this.board.columns) dd.addOption(col.id, col.label);
+        dd.setValue(newTargetCol);
+        dd.onChange((v) => (newTargetCol = v));
+      });
+
+    const addBtn = contentEl.createEl("button", { text: "추가", cls: "mod-cta" });
+    addBtn.addEventListener("click", async () => {
+      if (!newTitle.trim()) { new Notice("작업 제목을 입력하세요."); return; }
+      const task: RecurringTask = {
+        id: `recur-${Date.now()}`,
+        boardId: this.board.id,
+        title: newTitle.trim(),
+        tags: [],
+        recur: newRecur,
+        targetColumnId: newTargetCol,
+        lastCreated: undefined,
+      };
+      this.settings.recurringTasks.push(task);
+      await this.onSave();
+      new Notice(`"${task.title}" 반복 작업이 추가되었습니다.`);
+      this.render();
+    });
+  }
+
+  onClose() { this.contentEl.empty(); }
 }

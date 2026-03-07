@@ -985,6 +985,58 @@
   margin-top: 4px;
 }
 
+/* ── 반복 작업 관리 모달 ─────────────────────────────────── */
+
+.kanban-recurring-modal .kanban-recurring-desc {
+  color: var(--text-muted);
+  font-size: 0.88em;
+  margin-bottom: 12px;
+}
+
+.kanban-recurring-empty {
+  color: var(--text-faint);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.kanban-recurring-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.kanban-recurring-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+}
+
+.kanban-recurring-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.kanban-recurring-title {
+  font-weight: 600;
+  font-size: 0.92em;
+}
+
+.kanban-recurring-meta {
+  font-size: 0.75em;
+  color: var(--text-muted);
+}
+
+.kanban-recurring-del-btn {
+  font-size: 0.8em;
+  padding: 3px 10px;
+}
+
 /* ── 내부 링크 ───────────────────────────────────────────── */
 
 .kanban-internal-link {

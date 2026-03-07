@@ -111,6 +111,7 @@ export default class KanbanPlugin extends Plugin {
       boards: saved?.boards ?? DEFAULT_SETTINGS.boards,
       activeBoardId: saved?.activeBoardId ?? DEFAULT_SETTINGS.activeBoardId,
       upcomingDays: saved?.upcomingDays ?? DEFAULT_SETTINGS.upcomingDays,
+      recurringTasks: saved?.recurringTasks ?? DEFAULT_SETTINGS.recurringTasks,
     };
   }
 

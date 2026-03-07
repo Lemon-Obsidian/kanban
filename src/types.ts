@@ -29,10 +29,21 @@ export interface KanbanBoard {
   columns: KanbanColumn[];
 }
 
+export interface RecurringTask {
+  id: string;
+  boardId: string;
+  title: string;
+  tags: string[];
+  recur: "daily" | "weekly" | "monthly";
+  targetColumnId: string;
+  lastCreated?: string; // ISO — 마지막 카드 생성 시각
+}
+
 export interface KanbanSettings {
   boards: KanbanBoard[];
   activeBoardId: string;
   upcomingDays: number[];
+  recurringTasks: RecurringTask[];
 }
 
 export const DEFAULT_BOARD: KanbanBoard = {
@@ -50,4 +61,5 @@ export const DEFAULT_SETTINGS: KanbanSettings = {
   boards: [DEFAULT_BOARD],
   activeBoardId: "default",
   upcomingDays: [1, 7, 30],
+  recurringTasks: [],
 };
