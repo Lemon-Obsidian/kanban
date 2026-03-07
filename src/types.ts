@@ -35,6 +35,8 @@ export interface RecurringTask {
   title: string;
   tags: string[];
   recur: "daily" | "weekly" | "monthly";
+  dayOfWeek?: number;  // 0=일, 1=월, ..., 6=토 (weekly 전용)
+  dayOfMonth?: number; // 1~31 (monthly 전용)
   targetColumnId: string;
   lastCreated?: string; // ISO — 마지막 카드 생성 시각
 }

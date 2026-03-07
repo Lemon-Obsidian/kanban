@@ -1268,9 +1268,21 @@ export class KanbanView extends ItemView {
     if (!task.lastCreated) return true; // 한 번도 생성된 적 없으면 즉시 생성
     const last = new Date(task.lastCreated);
     const diffDays = (now.getTime() - last.getTime()) / 86_400_000;
-    if (task.recur === "daily")   return diffDays >= 1;
-    if (task.recur === "weekly")  return diffDays >= 7;
-    if (task.recur === "monthly") return diffDays >= 30;
+    if (task.recur === "daily") return diffDays >= 1;
+    if (task.recur === "weekly") {
+      if (task.dayOfWeek !== undefined) {
+        // 오늘이 지정 요일이고 마지막 생성이 6일 이상 전이어야 함 (같은 주 중복 방지)
+        return now.getDay() === task.dayOfWeek && diffDays >= 6;
+      }
+      return diffDays >= 7;
+    }
+    if (task.recur === "monthly") {
+      if (task.dayOfMonth !== undefined) {
+        // 오늘이 지정 날짜이고 마지막 생성이 25일 이상 전이어야 함 (같은 달 중복 방지)
+        return now.getDate() === task.dayOfMonth && diffDays >= 25;
+      }
+      return diffDays >= 30;
+    }
     return false;
   }
 
@@ -1546,6 +1558,21 @@ class RecurringTasksModal extends Modal {
       cls: "kanban-recurring-desc",
     });
 
+    const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+
+    const formatRecurLabel = (task: RecurringTask): string => {
+      if (task.recur === "daily") return "매일";
+      if (task.recur === "weekly") {
+        if (task.dayOfWeek !== undefined) return `매주 ${DAY_NAMES[task.dayOfWeek]}요일`;
+        return "매주";
+      }
+      if (task.recur === "monthly") {
+        if (task.dayOfMonth !== undefined) return `매월 ${task.dayOfMonth}일`;
+        return "매월";
+      }
+      return task.recur;
+    };
+
     const tasks = this.settings.recurringTasks.filter((t) => t.boardId === this.board.id);
 
     if (tasks.length === 0) {
@@ -1558,14 +1585,13 @@ class RecurringTasksModal extends Modal {
         const info = row.createDiv("kanban-recurring-info");
         info.createDiv({ text: task.title, cls: "kanban-recurring-title" });
 
-        const recurLabel: Record<string, string> = { daily: "매일", weekly: "매주", monthly: "매월" };
         const targetCol = this.board.columns.find((c) => c.id === task.targetColumnId)?.label ?? task.targetColumnId;
         const lastStr = task.lastCreated
           ? new Date(task.lastCreated).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
           : "아직 생성 안 됨";
 
         info.createDiv({
-          text: `${recurLabel[task.recur]} · ${targetCol} · 마지막 생성: ${lastStr}`,
+          text: `${formatRecurLabel(task)} · ${targetCol} · 마지막 생성: ${lastStr}`,
           cls: "kanban-recurring-meta",
         });
 
@@ -1585,6 +1611,8 @@ class RecurringTasksModal extends Modal {
 
     let newTitle = "";
     let newRecur: RecurringTask["recur"] = "weekly";
+    let newDayOfWeek: number | undefined = undefined;
+    let newDayOfMonth: number | undefined = undefined;
     let newTargetCol = this.board.columns.find((c) => !c.flushable)?.id ?? this.board.columns[0]?.id ?? "";
 
     new Setting(contentEl)
@@ -1594,6 +1622,31 @@ class RecurringTasksModal extends Modal {
         t.inputEl.style.width = "100%";
       });
 
+    const daySettingEl = contentEl.createDiv();
+
+    const renderDaySetting = () => {
+      daySettingEl.empty();
+      if (newRecur === "weekly") {
+        new Setting(daySettingEl)
+          .setName("요일 지정")
+          .addDropdown((dd) => {
+            dd.addOption("", "매주 (7일마다)");
+            for (let i = 0; i < 7; i++) dd.addOption(String(i), `매주 ${DAY_NAMES[i]}요일`);
+            dd.setValue(newDayOfWeek !== undefined ? String(newDayOfWeek) : "");
+            dd.onChange((v) => { newDayOfWeek = v === "" ? undefined : Number(v); });
+          });
+      } else if (newRecur === "monthly") {
+        new Setting(daySettingEl)
+          .setName("날짜 지정")
+          .addDropdown((dd) => {
+            dd.addOption("", "매월 (30일마다)");
+            for (let d = 1; d <= 31; d++) dd.addOption(String(d), `매월 ${d}일`);
+            dd.setValue(newDayOfMonth !== undefined ? String(newDayOfMonth) : "");
+            dd.onChange((v) => { newDayOfMonth = v === "" ? undefined : Number(v); });
+          });
+      }
+    };
+
     new Setting(contentEl)
       .setName("반복 주기")
       .addDropdown((dd) => {
@@ -1601,8 +1654,17 @@ class RecurringTasksModal extends Modal {
         dd.addOption("weekly", "매주");
         dd.addOption("monthly", "매월");
         dd.setValue(newRecur);
-        dd.onChange((v) => (newRecur = v as RecurringTask["recur"]));
+        dd.onChange((v) => {
+          newRecur = v as RecurringTask["recur"];
+          newDayOfWeek = undefined;
+          newDayOfMonth = undefined;
+          renderDaySetting();
+        });
       });
+
+    // 반복 주기 설정 바로 다음에 요일/날짜 드롭다운 삽입
+    contentEl.appendChild(daySettingEl);
+    renderDaySetting();
 
     new Setting(contentEl)
       .setName("생성 컬럼")
@@ -1621,6 +1683,8 @@ class RecurringTasksModal extends Modal {
         title: newTitle.trim(),
         tags: [],
         recur: newRecur,
+        dayOfWeek: newDayOfWeek,
+        dayOfMonth: newDayOfMonth,
         targetColumnId: newTargetCol,
         lastCreated: undefined,
       };
