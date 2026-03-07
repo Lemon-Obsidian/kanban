@@ -963,7 +963,8 @@ export class KanbanView extends ItemView {
     this.boardColumnsEl = null;
     containerEl.addClass("kanban-container");
 
-    const header = containerEl.createDiv("kanban-header");
+    const mainArea = containerEl.createDiv("kanban-main-area");
+    const header = mainArea.createDiv("kanban-header");
     const titleRow = header.createDiv("kanban-header-title-row");
     titleRow.createEl("button", { text: "← 보드로 돌아가기", cls: "kanban-back-btn" })
       .addEventListener("click", () => this.switchToBoard());
@@ -1027,7 +1028,7 @@ export class KanbanView extends ItemView {
       });
     }
 
-    const content = containerEl.createDiv("kanban-list-content");
+    const content = mainArea.createDiv("kanban-list-content");
     let hasAny = false;
 
     for (const group of groups) {
@@ -1082,7 +1083,8 @@ export class KanbanView extends ItemView {
     this.boardColumnsEl = null;
     containerEl.addClass("kanban-container");
 
-    const header = containerEl.createDiv("kanban-header");
+    const mainArea = containerEl.createDiv("kanban-main-area");
+    const header = mainArea.createDiv("kanban-header");
     const titleRow = header.createDiv("kanban-header-title-row");
     titleRow.createEl("button", { text: "← 보드로 돌아가기", cls: "kanban-back-btn" })
       .addEventListener("click", () => this.switchToBoard());
@@ -1111,7 +1113,7 @@ export class KanbanView extends ItemView {
       (v) => { this.archiveTagFilter = v; this.renderArchiveContent(content); },
       (t) => `#${t}`);
 
-    const content = containerEl.createDiv("kanban-list-content");
+    const content = mainArea.createDiv("kanban-list-content");
     this.renderArchiveContent(content);
   }
 
