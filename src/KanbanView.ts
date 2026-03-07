@@ -123,6 +123,47 @@ class FlushConfirmModal extends Modal {
   onClose() { this.contentEl.empty(); }
 }
 
+// ── RenameColumnModal ─────────────────────────────────────────────────────
+
+class RenameColumnModal extends Modal {
+  private value: string;
+
+  constructor(
+    app: Parameters<typeof Modal["prototype"]["constructor"]>[0],
+    private currentLabel: string,
+    private onRename: (newLabel: string) => void
+  ) {
+    super(app);
+    this.value = currentLabel;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "컬럼명 수정" });
+    let inputEl: HTMLInputElement;
+    new Setting(contentEl).setName("새 이름").addText((t) => {
+      t.setValue(this.currentLabel).onChange((v) => (this.value = v));
+      inputEl = t.inputEl;
+      inputEl.style.width = "100%";
+      setTimeout(() => { inputEl.select(); }, 50);
+    });
+    const btnRow = contentEl.createDiv("kanban-modal-buttons");
+    btnRow.createEl("button", { text: "취소" }).addEventListener("click", () => this.close());
+    btnRow.createEl("button", { text: "저장", cls: "mod-cta" })
+      .addEventListener("click", () => this.submit());
+    contentEl.addEventListener("keydown", (e) => { if (e.key === "Enter") this.submit(); });
+  }
+
+  private submit() {
+    const name = this.value.trim();
+    if (!name) { new Notice("컬럼 이름을 입력하세요."); return; }
+    this.onRename(name);
+    this.close();
+  }
+
+  onClose() { this.contentEl.empty(); }
+}
+
 // ── KanbanView ────────────────────────────────────────────────────────────
 
 type ViewMode = "board" | "archive" | "upcoming";
@@ -340,21 +381,36 @@ export class KanbanView extends ItemView {
     }).addEventListener("click", (e) => {
       const menu = new Menu();
       menu.addItem((item) =>
-        item.setTitle("컬럼 삭제").setIcon("trash").onClick(() => {
+        item.setTitle("컬럼명 수정").setIcon("pencil").onClick(() => {
+          new RenameColumnModal(this.app, label, async (newLabel) => {
+            const col = this.settings.columns.find((c) => c.id === columnId);
+            if (col) {
+              col.label = newLabel;
+              await this.saveSettings();
+              await this.refresh();
+              new Notice(`컬럼명이 "${newLabel}"으로 수정되었습니다.`);
+            }
+          }).open();
+        })
+      );
+      menu.addSeparator();
+      menu.addItem((item) =>
+        item.setTitle("컬럼 삭제").setIcon("trash").onClick(async () => {
           if (this.settings.columns.length <= 1) {
             new Notice("최소 1개의 컬럼이 필요합니다.");
             return;
           }
-          if (allCards.length > 0) {
-            new Notice(`카드 ${allCards.length}개를 먼저 이동하거나 보관하세요.`);
-            return;
-          }
+          const cardCount = allCards.length;
+          const message = cardCount > 0
+            ? `"${label}" 컬럼과 카드 ${cardCount}개가 모두 삭제됩니다. 계속하시겠습니까?`
+            : `"${label}" 컬럼을 삭제할까요?`;
           new ConfirmModal(this.app, {
             title: "컬럼 삭제",
-            message: `"${label}" 컬럼을 삭제할까요?`,
+            message,
             confirmText: "삭제",
             danger: true,
             onConfirm: async () => {
+              await this.fileManager.deleteColumn(columnId);
               this.settings.columns = this.settings.columns.filter((c) => c.id !== columnId);
               await this.saveSettings();
               await this.refresh();

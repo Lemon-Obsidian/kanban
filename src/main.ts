@@ -1,5 +1,6 @@
 import {
   App,
+  Modal,
   Notice,
   Plugin,
   PluginSettingTab,
@@ -211,16 +212,22 @@ class KanbanSettingTab extends PluginSettingTab {
               return;
             }
             const cards = await this.plugin.fileManager.loadCards(col.id);
-            if (cards.length > 0) {
-              new Notice(
-                `"${col.label}" 컬럼에 카드가 ${cards.length}개 있습니다. 먼저 카드를 이동하거나 삭제하세요.`
-              );
-              return;
-            }
-            cols.splice(i, 1);
-            await this.plugin.saveSettings();
-            this.plugin.refreshAllViews();
-            this.display();
+            const cardCount = cards.length;
+            const message = cardCount > 0
+              ? `"${col.label}" 컬럼과 카드 ${cardCount}개가 모두 삭제됩니다. 계속하시겠습니까?`
+              : `"${col.label}" 컬럼을 삭제할까요?`;
+            new SettingConfirmModal(this.app, {
+              title: "컬럼 삭제",
+              message,
+              confirmText: "삭제",
+              onConfirm: async () => {
+                await this.plugin.fileManager.deleteColumn(col.id);
+                cols.splice(i, 1);
+                await this.plugin.saveSettings();
+                this.plugin.refreshAllViews();
+                this.display();
+              },
+            }).open();
           })
       );
     }
@@ -338,4 +345,30 @@ class KanbanSettingTab extends PluginSettingTab {
     this.display();
     new Notice(`"${name}" 컬럼이 추가되었습니다.`);
   }
+}
+
+class SettingConfirmModal extends Modal {
+  constructor(
+    app: App,
+    private opts: {
+      title: string;
+      message: string;
+      confirmText: string;
+      onConfirm: () => void;
+    }
+  ) {
+    super(app);
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: this.opts.title });
+    contentEl.createEl("p", { text: this.opts.message });
+    const btnRow = contentEl.createDiv({ cls: "kanban-modal-buttons" });
+    btnRow.createEl("button", { text: "취소" }).addEventListener("click", () => this.close());
+    const confirmBtn = btnRow.createEl("button", { text: this.opts.confirmText, cls: "mod-warning" });
+    confirmBtn.addEventListener("click", () => { this.opts.onConfirm(); this.close(); });
+  }
+
+  onClose() { this.contentEl.empty(); }
 }

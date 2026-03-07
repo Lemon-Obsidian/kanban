@@ -176,6 +176,16 @@ export class FileManager {
     await this.app.vault.trash(file, true);
   }
 
+  async deleteColumn(columnId: string): Promise<number> {
+    const folder = this.app.vault.getAbstractFileByPath(this.getColumnPath(columnId));
+    if (!(folder instanceof TFolder)) return 0;
+    const count = folder.children.filter(
+      (c) => c instanceof TFile && (c as TFile).extension === "md"
+    ).length;
+    await this.app.vault.trash(folder, true);
+    return count;
+  }
+
   // ── Flush ────────────────────────────────────────────────────────────────
 
   async flushColumn(columnId: string): Promise<number> {
