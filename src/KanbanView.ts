@@ -697,15 +697,15 @@ export class KanbanView extends ItemView {
       type: "text",
       cls: "kanban-quick-add-input",
     });
-    quickInput.placeholder = "+ 카드 추가...";
+    quickInput.placeholder = "+ 카드 추가... (#태그 !높음 ^2026-03-15)";
     quickInput.addEventListener("keydown", async (e) => {
       if (e.key === "Enter") {
-        const title = quickInput.value.trim();
-        if (!title) return;
+        const raw = quickInput.value.trim();
+        if (!raw) return;
+        const parsed = this.parseQuickInput(raw);
+        if (!parsed.title) return;
         await this.fileManager.createCard({
-          title,
-          tags: [],
-          priority: "medium",
+          ...parsed,
           created: new Date().toISOString(),
           content: "",
           status: columnId,
@@ -1284,6 +1284,56 @@ export class KanbanView extends ItemView {
       return diffDays >= 30;
     }
     return false;
+  }
+
+  // ── 빠른 입력 파서 ────────────────────────────────────────────────────────
+
+  private parseQuickInput(raw: string): {
+    title: string;
+    tags: string[];
+    priority?: KanbanCard["priority"];
+    due?: string;
+  } {
+    const PRIORITY_MAP: Record<string, KanbanCard["priority"]> = {
+      "!낮음": "low", "!중간": "medium", "!높음": "high", "!ASAP": "asap", "!asap": "asap",
+    };
+
+    const tags: string[] = [];
+    let priority: KanbanCard["priority"] | undefined;
+    let due: string | undefined;
+    const titleTokens: string[] = [];
+
+    for (const token of raw.trim().split(/\s+/)) {
+      if (token.startsWith("#") && token.length > 1) {
+        tags.push(token.slice(1));
+      } else if (PRIORITY_MAP[token] !== undefined) {
+        priority = PRIORITY_MAP[token];
+      } else if (token.startsWith("^") && token.length > 1) {
+        due = this.parseQuickDue(token.slice(1));
+      } else {
+        titleTokens.push(token);
+      }
+    }
+
+    return { title: titleTokens.join(" "), tags, priority, due };
+  }
+
+  private parseQuickDue(raw: string): string {
+    const today = new Date();
+    if (raw === "오늘") return today.toISOString().slice(0, 10);
+    if (raw === "내일") {
+      const d = new Date(today);
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().slice(0, 10);
+    }
+    // MM/DD → 올해 YYYY-MM-DD
+    const mmdd = raw.match(/^(\d{1,2})\/(\d{1,2})$/);
+    if (mmdd) {
+      return `${today.getFullYear()}-${mmdd[1].padStart(2, "0")}-${mmdd[2].padStart(2, "0")}`;
+    }
+    // YYYY-MM-DD 그대로
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+    return raw;
   }
 
   private openRecurringTasksModal() {
