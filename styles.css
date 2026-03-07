@@ -753,6 +753,21 @@
   opacity: 0.5;
 }
 
+/* ── 내부 링크 ───────────────────────────────────────────── */
+
+.kanban-internal-link {
+  color: var(--link-color, var(--interactive-accent));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: opacity 0.12s ease;
+}
+
+.kanban-internal-link:hover {
+  opacity: 0.75;
+}
+
 /* ── 퀵 추가 입력 ────────────────────────────────────────── */
 
 .kanban-quick-add {

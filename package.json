@@ -1,6 +1,6 @@
 {
   "name": "@lemon/kanban",
-  "version": "1.7.9",
+  "version": "1.8.0",
   "description": "Kanban board for Obsidian with hashtag support",
   "license": "MIT",
   "main": "main.js",

@@ -737,7 +737,7 @@ export class KanbanView extends ItemView {
     if (textContent) {
       const preview = textContent.length > 100 ? textContent.slice(0, 100) + "..." : textContent;
       const contentEl = cardEl.createDiv("kanban-card-content");
-      this.highlightText(contentEl, preview, this.boardSearch);
+      this.renderContentWithLinks(contentEl, preview, this.boardSearch);
     }
 
     // 체크리스트 인터랙티브 렌더링
@@ -759,10 +759,8 @@ export class KanbanView extends ItemView {
           await this.refresh();
         });
 
-        itemEl.createSpan({
-          text: item.text,
-          cls: `kanban-card-checklist-text${item.checked ? " checked" : ""}`,
-        });
+        const textSpan = itemEl.createSpan({ cls: `kanban-card-checklist-text${item.checked ? " checked" : ""}` });
+        this.renderContentWithLinks(textSpan, item.text, this.boardSearch);
       }
     }
 
@@ -1172,6 +1170,24 @@ export class KanbanView extends ItemView {
   private formatMonth(yyyyMM: string): string {
     const [y, m] = yyyyMM.split("-");
     return `${y}년 ${parseInt(m)}월`;
+  }
+
+  private renderContentWithLinks(parent: HTMLElement, text: string, query: string) {
+    const linkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+    let last = 0;
+    let match: RegExpExecArray | null;
+    while ((match = linkRegex.exec(text)) !== null) {
+      if (match.index > last) this.highlightText(parent, text.slice(last, match.index), query);
+      const target = match[1].trim();
+      const alias = (match[2] ?? match[1]).trim();
+      const linkEl = parent.createEl("span", { text: alias, cls: "kanban-internal-link" });
+      linkEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.app.workspace.openLinkText(target, "", false);
+      });
+      last = match.index + match[0].length;
+    }
+    if (last < text.length) this.highlightText(parent, text.slice(last), query);
   }
 
   private highlightText(parent: HTMLElement, text: string, query: string) {
