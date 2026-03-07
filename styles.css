@@ -619,6 +619,13 @@
   word-break: break-word;
 }
 
+.kanban-search-highlight {
+  background: rgba(255, 200, 0, 0.35);
+  border-radius: 2px;
+  padding: 0 1px;
+  color: inherit;
+}
+
 .kanban-card-due {
   display: inline-flex;
   align-items: center;

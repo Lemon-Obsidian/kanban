@@ -707,7 +707,7 @@ export class KanbanView extends ItemView {
 
     // 제목 + 우선순위 chip (chip은 제목 텍스트 바로 오른쪽 인라인)
     const titleEl = cardEl.createDiv("kanban-card-title");
-    titleEl.createSpan({ text: card.title });
+    this.highlightText(titleEl, card.title, this.boardSearch);
     if (card.priority && card.priority !== "medium") {
       const priorityLabel: Record<string, string> = { low: "우선순위 낮음", high: "우선순위 높음", asap: "우선순위 ASAP" };
       titleEl.createSpan({
@@ -730,7 +730,8 @@ export class KanbanView extends ItemView {
     const { text: textContent, items: checklistItems } = parseChecklist(card.content);
     if (textContent) {
       const preview = textContent.length > 100 ? textContent.slice(0, 100) + "..." : textContent;
-      cardEl.createDiv({ text: preview, cls: "kanban-card-content" });
+      const contentEl = cardEl.createDiv("kanban-card-content");
+      this.highlightText(contentEl, preview, this.boardSearch);
     }
 
     // 체크리스트 인터랙티브 렌더링
@@ -762,11 +763,18 @@ export class KanbanView extends ItemView {
     // 태그
     if (card.tags.length > 0) {
       const tagsEl = cardEl.createDiv("kanban-card-tags");
+      const tagQ = this.boardSearch.startsWith("#") ? this.boardSearch.slice(1).toLowerCase() : "";
       for (const tag of card.tags) {
-        tagsEl.createEl("span", {
-          text: `#${tag}`,
+        const tagEl = tagsEl.createEl("span", {
           cls: `kanban-tag${this.activeTagFilter === tag ? " active" : ""}`,
-        }).addEventListener("click", (e) => {
+        });
+        if (tagQ) {
+          tagEl.appendText("#");
+          this.highlightText(tagEl, tag, tagQ);
+        } else {
+          tagEl.textContent = `#${tag}`;
+        }
+        tagEl.addEventListener("click", (e) => {
           e.stopPropagation();
           this.activeTagFilter = this.activeTagFilter === tag ? null : tag;
           this.render();
@@ -1149,6 +1157,20 @@ export class KanbanView extends ItemView {
   private formatMonth(yyyyMM: string): string {
     const [y, m] = yyyyMM.split("-");
     return `${y}년 ${parseInt(m)}월`;
+  }
+
+  private highlightText(parent: HTMLElement, text: string, query: string) {
+    if (!query) { parent.appendText(text); return; }
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    let last = 0;
+    let idx: number;
+    while ((idx = lowerText.indexOf(lowerQuery, last)) !== -1) {
+      if (idx > last) parent.appendText(text.slice(last, idx));
+      parent.createSpan({ text: text.slice(idx, idx + lowerQuery.length), cls: "kanban-search-highlight" });
+      last = idx + lowerQuery.length;
+    }
+    if (last < text.length) parent.appendText(text.slice(last));
   }
 
   async onClose() { this.containerEl.empty(); }
