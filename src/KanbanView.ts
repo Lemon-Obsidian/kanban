@@ -697,7 +697,7 @@ export class KanbanView extends ItemView {
       type: "text",
       cls: "kanban-quick-add-input",
     });
-    quickInput.placeholder = "+ 카드 추가... (#태그 !높음 ^2026-03-15)";
+    quickInput.placeholder = "+ 카드 추가... (#태그 !높음 ^2026-03-15 / ^3/15 / ^오늘)";
     quickInput.addEventListener("keydown", async (e) => {
       if (e.key === "Enter") {
         const raw = quickInput.value.trim();
