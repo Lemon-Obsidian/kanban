@@ -34,6 +34,14 @@ class ConfirmModal extends Modal {
       cls: this.opts.danger ? "mod-warning" : "mod-cta",
     });
     confirmBtn.addEventListener("click", () => { this.opts.onConfirm(); this.close(); });
+
+    // Enter → 확인 / Escape → 취소 (Obsidian 기본 Esc 동작 덮어쓰기)
+    this.scope.register([], "Enter", (e) => {
+      e.preventDefault();
+      this.opts.onConfirm();
+      this.close();
+      return false;
+    });
   }
 
   onClose() { this.contentEl.empty(); }
