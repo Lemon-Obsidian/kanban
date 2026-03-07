@@ -1,4 +1,4 @@
-import { ItemView, Menu, Modal, Notice, Setting, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, Menu, Modal, Notice, Setting, WorkspaceLeaf } from "obsidian";
 import { ArchivedCard, KanbanCard, KanbanColumn, KanbanSettings } from "./types";
 import { FileManager } from "./FileManager";
 import { CardModal } from "./CardModal";
@@ -114,7 +114,6 @@ class FlushConfirmModal extends Modal {
     contentEl.createEl("p", {
       text: `"${this.columnLabel}" 컬럼의 카드 ${this.count}개를 아카이브로 보관합니다. 계속하시겠습니까?`,
     });
-
     const btnRow = contentEl.createDiv("kanban-modal-buttons");
     btnRow.createEl("button", { text: "취소" }).addEventListener("click", () => this.close());
     const confirmBtn = btnRow.createEl("button", { text: "보관하기", cls: "mod-warning" });
@@ -185,38 +184,30 @@ export class KanbanView extends ItemView {
 
     const header = containerEl.createDiv("kanban-header");
 
-    // 타이틀 + 헤더 버튼
     const titleRow = header.createDiv("kanban-header-title-row");
     titleRow.createEl("h1", { text: "Kanban Board", cls: "kanban-title" });
 
     const headerBtns = titleRow.createDiv("kanban-header-btns");
-    const upcomingBtn = headerBtns.createEl("button", {
+    headerBtns.createEl("button", {
+      text: "📅 마감 임박",
       cls: "kanban-header-btn",
-      title: "마감 임박 카드 보기",
-    });
-    setIcon(upcomingBtn, "calendar-clock");
-    upcomingBtn.createSpan({ text: "마감 임박" });
-    upcomingBtn.addEventListener("click", () => this.switchToUpcoming());
+      title: "마감일 기준으로 카드 보기",
+    }).addEventListener("click", () => this.switchToUpcoming());
 
-    const archiveBtn = headerBtns.createEl("button", {
+    headerBtns.createEl("button", {
+      text: "🗃 아카이브",
       cls: "kanban-header-btn",
       title: "아카이브 히스토리 보기",
-    });
-    setIcon(archiveBtn, "archive");
-    archiveBtn.createSpan({ text: "아카이브" });
-    archiveBtn.addEventListener("click", () => this.switchToArchive());
+    }).addEventListener("click", () => this.switchToArchive());
 
     // 검색 + 정렬
     const controlsRow = header.createDiv("kanban-controls-row");
 
-    const searchWrap = controlsRow.createDiv("kanban-search-wrap");
-    const searchIcon = searchWrap.createDiv("kanban-search-icon");
-    setIcon(searchIcon, "search");
-    const searchInput = searchWrap.createEl("input", {
+    const searchInput = controlsRow.createEl("input", {
       type: "text",
       cls: "kanban-search-input",
     });
-    searchInput.placeholder = "카드 검색 (제목, 내용, 태그)...";
+    searchInput.placeholder = "🔍  카드 검색 (제목, 내용, 태그)...";
     searchInput.value = this.boardSearch;
     searchInput.addEventListener("input", (e) => {
       this.boardSearch = (e.target as HTMLInputElement).value;
@@ -235,17 +226,15 @@ export class KanbanView extends ItemView {
       sortGroup.querySelectorAll<HTMLElement>(".kanban-sort-btn").forEach((btn, i) => {
         const opt = sortOptions[i];
         const isActive = this.sortBy === opt.value;
-        const dirIcon = isActive ? (this.sortDir === "desc" ? " ↓" : " ↑") : "";
-        btn.textContent = opt.label + dirIcon;
+        btn.textContent = opt.label + (isActive ? (this.sortDir === "desc" ? " ↓" : " ↑") : "");
         btn.classList.toggle("active", isActive);
       });
     };
 
     for (const opt of sortOptions) {
       const isActive = this.sortBy === opt.value;
-      const dirIcon = isActive ? (this.sortDir === "desc" ? " ↓" : " ↑") : "";
       const btn = sortGroup.createEl("button", {
-        text: opt.label + dirIcon,
+        text: opt.label + (isActive ? (this.sortDir === "desc" ? " ↓" : " ↑") : ""),
         cls: `kanban-sort-btn${isActive ? " active" : ""}`,
       });
       btn.addEventListener("click", () => {
@@ -275,8 +264,7 @@ export class KanbanView extends ItemView {
     }
 
     const addColPlaceholder = this.boardColumnsEl.createDiv("kanban-add-column-placeholder");
-    const addColIcon = addColPlaceholder.createDiv("kanban-add-column-icon");
-    setIcon(addColIcon, "plus");
+    addColPlaceholder.createDiv({ text: "+", cls: "kanban-add-column-plus" });
     addColPlaceholder.createDiv({ text: "컬럼 추가", cls: "kanban-add-column-label" });
     addColPlaceholder.addEventListener("click", () => {
       new AddColumnModal(
@@ -300,18 +288,16 @@ export class KanbanView extends ItemView {
 
     const bar = parent.createDiv("kanban-tag-filter-bar");
 
-    const allBtn = bar.createEl("button", {
+    bar.createEl("button", {
       text: "전체",
       cls: `kanban-tag-btn${this.activeTagFilter === null ? " active" : ""}`,
-    });
-    allBtn.addEventListener("click", () => { this.activeTagFilter = null; this.render(); });
+    }).addEventListener("click", () => { this.activeTagFilter = null; this.render(); });
 
     for (const tag of [...allTags].sort()) {
-      const btn = bar.createEl("button", {
+      bar.createEl("button", {
         text: `#${tag}`,
         cls: `kanban-tag-btn${this.activeTagFilter === tag ? " active" : ""}`,
-      });
-      btn.addEventListener("click", () => {
+      }).addEventListener("click", () => {
         this.activeTagFilter = this.activeTagFilter === tag ? null : tag;
         this.render();
       });
@@ -333,28 +319,24 @@ export class KanbanView extends ItemView {
     const colHeaderRight = colHeader.createDiv("kanban-column-header-right");
 
     if (flushable && allCards.length > 0) {
-      const flushBtn = colHeaderRight.createEl("button", {
+      colHeaderRight.createEl("button", {
+        text: `보관 (${allCards.length})`,
         cls: "kanban-flush-btn",
         title: `${allCards.length}개 카드를 아카이브로 보관`,
-      });
-      setIcon(flushBtn, "archive");
-      flushBtn.createSpan({ text: `보관 (${allCards.length})` });
-      flushBtn.addEventListener("click", () => this.openFlushModal(columnId, label, allCards.length));
+      }).addEventListener("click", () => this.openFlushModal(columnId, label, allCards.length));
     }
 
-    const addBtn = colHeaderRight.createEl("button", {
+    colHeaderRight.createEl("button", {
+      text: "+",
       cls: "kanban-col-icon-btn",
       title: "새 카드 추가",
-    });
-    setIcon(addBtn, "plus");
-    addBtn.addEventListener("click", () => this.openAddModal(columnId));
+    }).addEventListener("click", () => this.openAddModal(columnId));
 
-    const menuBtn = colHeaderRight.createEl("button", {
+    colHeaderRight.createEl("button", {
+      text: "···",
       cls: "kanban-col-icon-btn kanban-col-menu-btn",
       title: "컬럼 옵션",
-    });
-    setIcon(menuBtn, "more-horizontal");
-    menuBtn.addEventListener("click", (e) => {
+    }).addEventListener("click", (e) => {
       const menu = new Menu();
       menu.addItem((item) =>
         item.setTitle("컬럼 삭제").setIcon("trash").onClick(() => {
@@ -401,8 +383,7 @@ export class KanbanView extends ItemView {
     });
 
     if (allCards.length === 0) {
-      const emptyEl = cardsEl.createDiv("kanban-empty-col");
-      emptyEl.createDiv({ text: "카드 없음", cls: "kanban-empty-col-text" });
+      cardsEl.createDiv({ text: "카드 없음", cls: "kanban-empty-col" });
     } else {
       for (const card of allCards) this.renderCard(cardsEl, card);
     }
@@ -413,7 +394,7 @@ export class KanbanView extends ItemView {
       type: "text",
       cls: "kanban-quick-add-input",
     });
-    quickInput.placeholder = "카드 추가...";
+    quickInput.placeholder = "+ 카드 추가...";
     quickInput.addEventListener("keydown", async (e) => {
       if (e.key === "Enter") {
         const title = quickInput.value.trim();
@@ -484,31 +465,21 @@ export class KanbanView extends ItemView {
     });
     cardEl.addEventListener("dragend", () => cardEl.removeClass("dragging"));
 
-    // 카드 hover 액션 버튼
+    // hover 액션 버튼
     const actionsEl = cardEl.createDiv("kanban-card-actions");
-
-    const editBtn = actionsEl.createEl("button", { cls: "kanban-card-action-btn", title: "편집" });
-    setIcon(editBtn, "pencil");
-    editBtn.addEventListener("click", (e) => { e.stopPropagation(); this.openEditModal(card); });
-
-    const deleteBtn = actionsEl.createEl("button", {
-      cls: "kanban-card-action-btn kanban-card-action-delete",
-      title: "삭제",
-    });
-    setIcon(deleteBtn, "trash");
-    deleteBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      new ConfirmModal(this.app, {
-        title: "카드 삭제",
-        message: `"${card.title}" 카드를 삭제할까요?`,
-        confirmText: "삭제",
-        danger: true,
-        onConfirm: async () => {
-          await this.fileManager.deleteCard(card);
-          await this.refresh();
-        },
-      }).open();
-    });
+    actionsEl.createEl("button", { text: "✎", cls: "kanban-card-action-btn", title: "편집" })
+      .addEventListener("click", (e) => { e.stopPropagation(); this.openEditModal(card); });
+    actionsEl.createEl("button", { text: "✕", cls: "kanban-card-action-btn kanban-card-action-delete", title: "삭제" })
+      .addEventListener("click", (e) => {
+        e.stopPropagation();
+        new ConfirmModal(this.app, {
+          title: "카드 삭제",
+          message: `"${card.title}" 카드를 삭제할까요?`,
+          confirmText: "삭제",
+          danger: true,
+          onConfirm: async () => { await this.fileManager.deleteCard(card); await this.refresh(); },
+        }).open();
+      });
 
     // 제목 + 체크리스트 진행률
     const titleRow = cardEl.createDiv("kanban-card-title-row");
@@ -518,7 +489,7 @@ export class KanbanView extends ItemView {
     if (checklistItems.length > 0) {
       const checked = checklistItems.filter((i) => i.checked).length;
       titleRow.createDiv({
-        text: `${checked}/${checklistItems.length}`,
+        text: `☑ ${checked}/${checklistItems.length}`,
         cls: `kanban-checklist-progress${checked === checklistItems.length ? " complete" : ""}`,
       });
     }
@@ -527,13 +498,13 @@ export class KanbanView extends ItemView {
     if (card.due) {
       const today = new Date().toISOString().split("T")[0];
       const overdue = card.due < today;
-      const dueEl = cardEl.createDiv({ cls: `kanban-card-due${overdue ? " overdue" : ""}` });
-      const dueIcon = dueEl.createSpan("kanban-card-due-icon");
-      setIcon(dueIcon, overdue ? "alert-circle" : "calendar");
-      dueEl.createSpan({ text: card.due });
+      cardEl.createDiv({
+        text: `${overdue ? "⚠ " : "📅 "}${card.due}`,
+        cls: `kanban-card-due${overdue ? " overdue" : ""}`,
+      });
     }
 
-    // 텍스트 내용 미리보기
+    // 텍스트 미리보기
     const { text: textContent } = parseChecklist(card.content);
     if (textContent) {
       const preview = textContent.length > 80 ? textContent.slice(0, 80) + "..." : textContent;
@@ -544,11 +515,10 @@ export class KanbanView extends ItemView {
     if (card.tags.length > 0) {
       const tagsEl = cardEl.createDiv("kanban-card-tags");
       for (const tag of card.tags) {
-        const tagEl = tagsEl.createEl("span", {
+        tagsEl.createEl("span", {
           text: `#${tag}`,
           cls: `kanban-tag${this.activeTagFilter === tag ? " active" : ""}`,
-        });
-        tagEl.addEventListener("click", (e) => {
+        }).addEventListener("click", (e) => {
           e.stopPropagation();
           this.activeTagFilter = this.activeTagFilter === tag ? null : tag;
           this.render();
@@ -556,7 +526,7 @@ export class KanbanView extends ItemView {
       }
     }
 
-    // 우클릭 메뉴
+    // 우클릭 컨텍스트 메뉴
     cardEl.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       const menu = new Menu();
@@ -579,10 +549,7 @@ export class KanbanView extends ItemView {
             message: `"${card.title}" 카드를 삭제할까요?`,
             confirmText: "삭제",
             danger: true,
-            onConfirm: async () => {
-              await this.fileManager.deleteCard(card);
-              await this.refresh();
-            },
+            onConfirm: async () => { await this.fileManager.deleteCard(card); await this.refresh(); },
           }).open();
         })
       );
@@ -642,30 +609,22 @@ export class KanbanView extends ItemView {
 
     const header = containerEl.createDiv("kanban-header");
     const titleRow = header.createDiv("kanban-header-title-row");
-
-    const backBtn = titleRow.createEl("button", { cls: "kanban-back-btn", title: "보드로 돌아가기" });
-    setIcon(backBtn, "arrow-left");
-    backBtn.createSpan({ text: "보드로 돌아가기" });
-    backBtn.addEventListener("click", () => this.switchToBoard());
-
-    titleRow.createEl("h2", { text: "마감 임박", cls: "kanban-view-title" });
+    titleRow.createEl("button", { text: "← 보드로 돌아가기", cls: "kanban-back-btn" })
+      .addEventListener("click", () => this.switchToBoard());
+    titleRow.createEl("h2", { text: "📅 마감 임박", cls: "kanban-view-title" });
 
     const todayDate = new Date();
     todayDate.setHours(0, 0, 0, 0);
     const todayStr = todayDate.toISOString().split("T")[0];
-
-    const weekDate = new Date(todayDate);
-    weekDate.setDate(weekDate.getDate() + 7);
+    const weekDate = new Date(todayDate); weekDate.setDate(weekDate.getDate() + 7);
     const weekStr = weekDate.toISOString().split("T")[0];
-
-    const monthDate = new Date(todayDate);
-    monthDate.setDate(monthDate.getDate() + 30);
+    const monthDate = new Date(todayDate); monthDate.setDate(monthDate.getDate() + 30);
     const monthStr = monthDate.toISOString().split("T")[0];
 
     const activeColumnIds = new Set(this.settings.columns.map((c) => c.id));
     const cardsWithDue = this.cards.filter((c) => c.due && activeColumnIds.has(c.status));
 
-    const groups: Array<{ key: string; label: string; cards: KanbanCard[] }> = [
+    const groups = [
       { key: "overdue", label: "기한 초과", cards: cardsWithDue.filter((c) => c.due! < todayStr) },
       { key: "today",   label: "오늘",      cards: cardsWithDue.filter((c) => c.due === todayStr) },
       { key: "week",    label: "이번 주 (7일 이내)",  cards: cardsWithDue.filter((c) => c.due! > todayStr && c.due! <= weekStr) },
@@ -679,26 +638,16 @@ export class KanbanView extends ItemView {
     for (const group of groups) {
       if (group.cards.length === 0) continue;
       hasAny = true;
-
       const section = content.createDiv("kanban-list-section");
-      const sectionHeader = section.createDiv("kanban-list-section-header");
-      sectionHeader.createSpan({
-        text: group.label,
-        cls: `kanban-list-section-label${group.key === "overdue" ? " overdue" : ""}`,
-      });
-      sectionHeader.createSpan({ text: String(group.cards.length), cls: "kanban-list-section-count" });
-
+      const sh = section.createDiv("kanban-list-section-header");
+      sh.createSpan({ text: group.label, cls: `kanban-list-section-label${group.key === "overdue" ? " overdue" : ""}` });
+      sh.createSpan({ text: String(group.cards.length), cls: "kanban-list-section-count" });
       const sorted = [...group.cards].sort((a, b) => a.due! > b.due! ? 1 : a.due! < b.due! ? -1 : 0);
-      for (const card of sorted) {
-        this.renderListCard(section, card);
-      }
+      for (const card of sorted) this.renderListCard(section, card);
     }
 
     if (!hasAny) {
-      const empty = content.createDiv("kanban-empty-state");
-      const emptyIcon = empty.createDiv("kanban-empty-icon");
-      setIcon(emptyIcon, "calendar");
-      empty.createDiv({ text: "마감일이 설정된 카드가 없습니다.", cls: "kanban-empty-text" });
+      content.createDiv({ text: "마감일이 설정된 카드가 없습니다.", cls: "kanban-empty-state-text" });
     }
   }
 
@@ -727,74 +676,50 @@ export class KanbanView extends ItemView {
     containerEl.addClass("kanban-container");
 
     const header = containerEl.createDiv("kanban-header");
-
     const titleRow = header.createDiv("kanban-header-title-row");
-    const backBtn = titleRow.createEl("button", { cls: "kanban-back-btn" });
-    setIcon(backBtn, "arrow-left");
-    backBtn.createSpan({ text: "보드로 돌아가기" });
-    backBtn.addEventListener("click", () => this.switchToBoard());
-    titleRow.createEl("h2", { text: "아카이브 히스토리", cls: "kanban-view-title" });
+    titleRow.createEl("button", { text: "← 보드로 돌아가기", cls: "kanban-back-btn" })
+      .addEventListener("click", () => this.switchToBoard());
+    titleRow.createEl("h2", { text: "🗃 아카이브 히스토리", cls: "kanban-view-title" });
 
-    // 검색
-    const searchWrap = header.createDiv("kanban-search-wrap");
-    const searchIcon = searchWrap.createDiv("kanban-search-icon");
-    setIcon(searchIcon, "search");
-    const searchInput = searchWrap.createEl("input", {
+    const searchInput = header.createEl("input", {
       type: "text",
-      placeholder: "제목, 내용, 태그 검색...",
+      placeholder: "🔍  제목, 내용, 태그 검색...",
       cls: "kanban-search-input",
     });
+    searchInput.style.marginBottom = "10px";
     searchInput.value = this.archiveSearch;
     searchInput.addEventListener("input", (e) => {
       this.archiveSearch = (e.target as HTMLInputElement).value;
       this.renderArchiveContent(content);
     });
 
-    // 필터
     const filterBar = header.createDiv("kanban-archive-filters");
-    this.renderArchiveFilterRow(filterBar, "월", this.getArchiveMonths(), this.archiveMonthFilter, (v) => {
-      this.archiveMonthFilter = v;
-      this.renderArchiveContent(content);
-    }, (m) => this.formatMonth(m));
-
-    this.renderArchiveFilterRow(filterBar, "컬럼", this.getArchiveColumns(), this.archiveColumnFilter, (v) => {
-      this.archiveColumnFilter = v;
-      this.renderArchiveContent(content);
-    }, (id) => this.settings.columns.find((c) => c.id === id)?.label ?? id);
-
-    this.renderArchiveFilterRow(filterBar, "태그", this.getArchiveTags(), this.archiveTagFilter, (v) => {
-      this.archiveTagFilter = v;
-      this.renderArchiveContent(content);
-    }, (t) => `#${t}`);
+    this.renderArchiveFilterRow(filterBar, "월", this.getArchiveMonths(), this.archiveMonthFilter,
+      (v) => { this.archiveMonthFilter = v; this.renderArchiveContent(content); },
+      (m) => this.formatMonth(m));
+    this.renderArchiveFilterRow(filterBar, "컬럼", this.getArchiveColumns(), this.archiveColumnFilter,
+      (v) => { this.archiveColumnFilter = v; this.renderArchiveContent(content); },
+      (id) => this.settings.columns.find((c) => c.id === id)?.label ?? id);
+    this.renderArchiveFilterRow(filterBar, "태그", this.getArchiveTags(), this.archiveTagFilter,
+      (v) => { this.archiveTagFilter = v; this.renderArchiveContent(content); },
+      (t) => `#${t}`);
 
     const content = containerEl.createDiv("kanban-list-content");
     this.renderArchiveContent(content);
   }
 
   private renderArchiveFilterRow(
-    parent: HTMLElement,
-    label: string,
-    values: string[],
-    active: string | null,
-    onChange: (v: string | null) => void,
-    format: (v: string) => string
+    parent: HTMLElement, label: string, values: string[],
+    active: string | null, onChange: (v: string | null) => void, format: (v: string) => string
   ) {
     if (values.length === 0) return;
     const row = parent.createDiv("kanban-archive-filter-row");
     row.createSpan({ text: `${label}: `, cls: "kanban-filter-label" });
-
-    const allBtn = row.createEl("button", {
-      text: "전체",
-      cls: `kanban-tag-btn${active === null ? " active" : ""}`,
-    });
-    allBtn.addEventListener("click", () => { onChange(null); this.renderArchive(); });
-
+    row.createEl("button", { text: "전체", cls: `kanban-tag-btn${active === null ? " active" : ""}` })
+      .addEventListener("click", () => { onChange(null); this.renderArchive(); });
     for (const v of values) {
-      const btn = row.createEl("button", {
-        text: format(v),
-        cls: `kanban-tag-btn${active === v ? " active" : ""}`,
-      });
-      btn.addEventListener("click", () => { onChange(v); this.renderArchive(); });
+      row.createEl("button", { text: format(v), cls: `kanban-tag-btn${active === v ? " active" : ""}` })
+        .addEventListener("click", () => { onChange(v); this.renderArchive(); });
     }
   }
 
@@ -803,10 +728,7 @@ export class KanbanView extends ItemView {
     const filtered = this.getFilteredArchived();
 
     if (filtered.length === 0) {
-      const empty = container.createDiv("kanban-empty-state");
-      const emptyIcon = empty.createDiv("kanban-empty-icon");
-      setIcon(emptyIcon, "archive");
-      empty.createDiv({ text: "아카이브된 카드가 없습니다.", cls: "kanban-empty-text" });
+      container.createDiv({ text: "아카이브된 카드가 없습니다.", cls: "kanban-empty-state-text" });
       return;
     }
 
@@ -819,30 +741,23 @@ export class KanbanView extends ItemView {
 
     for (const [month, cards] of [...groups.entries()].sort().reverse()) {
       const section = container.createDiv("kanban-list-section");
-      const sectionHeader = section.createDiv("kanban-list-section-header");
-      sectionHeader.createSpan({ text: this.formatMonth(month), cls: "kanban-list-section-label" });
-      sectionHeader.createSpan({ text: String(cards.length), cls: "kanban-list-section-count" });
-
-      for (const card of cards) {
-        this.renderListCard(section, card, card.flushedAt);
-      }
+      const sh = section.createDiv("kanban-list-section-header");
+      sh.createSpan({ text: this.formatMonth(month), cls: "kanban-list-section-label" });
+      sh.createSpan({ text: String(cards.length), cls: "kanban-list-section-count" });
+      for (const card of cards) this.renderListCard(section, card, card.flushedAt);
     }
   }
 
-  /** 마감 임박 뷰 + 아카이브 뷰 공용 카드 렌더러 */
   private renderListCard(parent: HTMLElement, card: KanbanCard, flushedAt?: string) {
-    const colLabel = this.settings.columns.find((c) => c.id === card.status)?.label ?? card.status;
-    const priorityColor: Record<string, string> = {
-      low: "#3498db", medium: "", high: "#f39c12", asap: "#e74c3c",
-    };
     const flushedFrom = (card as ArchivedCard).flushedFrom;
     const colId = flushedFrom ?? card.status;
-    const colLabelResolved = this.settings.columns.find((c) => c.id === colId)?.label ?? colId;
+    const colLabel = this.settings.columns.find((c) => c.id === colId)?.label ?? colId;
+    const priorityColor: Record<string, string> = { low: "#3498db", high: "#f39c12", asap: "#e74c3c" };
 
     const cardEl = parent.createDiv("kanban-list-card");
 
     const topRow = cardEl.createDiv("kanban-list-card-top");
-    topRow.createSpan({ text: colLabelResolved, cls: `kanban-status-badge status-${colId}` });
+    topRow.createSpan({ text: colLabel, cls: `kanban-status-badge status-${colId}` });
     topRow.createSpan({ text: card.title, cls: "kanban-list-card-title" });
     if (card.priority && card.priority !== "medium") {
       const dot = topRow.createSpan({ cls: "kanban-priority-dot" });
@@ -852,8 +767,10 @@ export class KanbanView extends ItemView {
     const metaRow = cardEl.createDiv("kanban-list-card-meta");
     if (card.due) {
       const today = new Date().toISOString().split("T")[0];
-      const dueSpan = metaRow.createSpan({ text: `📅 ${card.due}`, cls: "kanban-tag" });
-      if (card.due < today && !flushedAt) dueSpan.addClass("overdue-tag");
+      metaRow.createSpan({
+        text: `📅 ${card.due}`,
+        cls: `kanban-tag${card.due < today && !flushedAt ? " overdue-tag" : ""}`,
+      });
     }
     if (flushedAt) {
       metaRow.createSpan({
@@ -900,11 +817,9 @@ export class KanbanView extends ItemView {
       if (this.archiveTagFilter && !card.tags.includes(this.archiveTagFilter)) return false;
       if (this.archiveSearch) {
         const q = this.archiveSearch.toLowerCase();
-        const hit =
-          card.title.toLowerCase().includes(q) ||
-          card.content.toLowerCase().includes(q) ||
-          card.tags.some((t) => t.toLowerCase().includes(q));
-        if (!hit) return false;
+        if (!card.title.toLowerCase().includes(q) &&
+            !card.content.toLowerCase().includes(q) &&
+            !card.tags.some((t) => t.toLowerCase().includes(q))) return false;
       }
       return true;
     });

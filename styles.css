@@ -62,12 +62,6 @@
   transition: all 0.15s ease;
 }
 
-.kanban-header-btn .svg-icon {
-  width: 13px;
-  height: 13px;
-  flex-shrink: 0;
-}
-
 .kanban-header-btn:hover {
   background: var(--interactive-accent);
   color: white;
@@ -89,11 +83,6 @@
   flex-shrink: 0;
 }
 
-.kanban-back-btn .svg-icon {
-  width: 13px;
-  height: 13px;
-}
-
 .kanban-back-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
@@ -109,37 +98,10 @@
   flex-wrap: wrap;
 }
 
-.kanban-search-wrap {
+.kanban-search-input {
   flex: 1;
   min-width: 160px;
-  position: relative;
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-/* 아카이브 뷰에서도 사용하므로 margin 없이 */
-.kanban-controls-row .kanban-search-wrap {
-  margin-bottom: 0;
-}
-
-.kanban-search-icon {
-  position: absolute;
-  left: 10px;
-  color: var(--text-faint);
-  display: flex;
-  align-items: center;
-  pointer-events: none;
-}
-
-.kanban-search-icon .svg-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.kanban-search-input {
-  width: 100%;
-  padding: 7px 12px 7px 32px;
+  padding: 7px 12px;
   border-radius: 8px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
@@ -330,11 +292,6 @@
   opacity: 0.55;
 }
 
-.kanban-col-icon-btn .svg-icon {
-  width: 14px;
-  height: 14px;
-}
-
 .kanban-column-header:hover .kanban-col-icon-btn {
   opacity: 1;
 }
@@ -371,11 +328,6 @@
   transition: all 0.12s ease;
   margin-right: 4px;
   opacity: 0;
-}
-
-.kanban-flush-btn .svg-icon {
-  width: 12px;
-  height: 12px;
 }
 
 .kanban-column-header:hover .kanban-flush-btn {
@@ -492,11 +444,6 @@
   justify-content: center;
   transition: all 0.12s ease;
   backdrop-filter: blur(4px);
-}
-
-.kanban-card-action-btn .svg-icon {
-  width: 12px;
-  height: 12px;
 }
 
 .kanban-card-action-btn:hover {
@@ -646,13 +593,10 @@
   background: rgba(var(--interactive-accent-rgb, 100, 120, 200), 0.04);
 }
 
-.kanban-add-column-icon {
+.kanban-add-column-plus {
+  font-size: 1.6em;
   color: var(--text-faint);
-}
-
-.kanban-add-column-icon .svg-icon {
-  width: 20px;
-  height: 20px;
+  line-height: 1;
 }
 
 .kanban-add-column-label {
@@ -843,25 +787,11 @@
 
 /* ── 빈 상태 ─────────────────────────────────────────────── */
 
-.kanban-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
+.kanban-empty-state-text {
+  text-align: center;
   padding: 60px 20px;
-  color: var(--text-faint);
-}
-
-.kanban-empty-icon .svg-icon {
-  width: 36px;
-  height: 36px;
-  opacity: 0.3;
-}
-
-.kanban-empty-text {
   font-size: 0.9em;
-  opacity: 0.6;
+  color: var(--text-faint);
 }
 
 /* ── 확인 모달 ───────────────────────────────────────────── */
