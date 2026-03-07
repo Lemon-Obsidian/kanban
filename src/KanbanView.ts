@@ -703,7 +703,7 @@ export class KanbanView extends ItemView {
     hint.innerHTML =
       `<span>#태그</span> 태그 &nbsp;·&nbsp; ` +
       `<span>!낮음 !중간 !높음 !ASAP</span> 우선순위<br>` +
-      `<span>^2026-03-15</span> · <span>^3/15</span> · <span>^오늘</span> · <span>^내일</span> &nbsp;마감일`;
+      `<span>^2026-03-15</span> · <span>^3/15</span> · <span>^오늘</span> · <span>^내일</span> · <span>^N일후</span> &nbsp;마감일`;
     quickInput.addEventListener("keydown", async (e) => {
       if (e.key === "Enter") {
         const raw = quickInput.value.trim();
@@ -1347,6 +1347,13 @@ export class KanbanView extends ItemView {
     if (raw === "내일") {
       const d = new Date(today);
       d.setDate(d.getDate() + 1);
+      return d.toISOString().slice(0, 10);
+    }
+    // N일후 / N일 후
+    const nDays = raw.match(/^(\d+)일\s*후$/);
+    if (nDays) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + parseInt(nDays[1]));
       return d.toISOString().slice(0, 10);
     }
     // MM/DD → 올해 YYYY-MM-DD
