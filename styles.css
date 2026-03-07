@@ -784,31 +784,30 @@
 
 .kanban-priority-toggle {
   display: flex;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--background-modifier-border);
+  gap: 5px;
+  flex-wrap: wrap;
 }
 
 .kanban-priority-btn {
   flex: 1;
-  padding: 5px 0;
-  border: none;
+  padding: 5px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 7px;
   background: var(--background-secondary);
   cursor: pointer;
   font-size: 0.82em;
   font-weight: 500;
   color: var(--text-muted);
-  transition: background 0.12s ease, color 0.12s ease;
-  border-right: 1px solid var(--background-modifier-border);
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  white-space: nowrap;
 }
 
-.kanban-priority-btn:last-child { border-right: none; }
-.kanban-priority-btn:hover { background: var(--background-modifier-hover); }
+.kanban-priority-btn:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
 
-.priority-btn-low.active    { background: rgba(52, 152, 219, 0.12);  color: #3498db; font-weight: 700; }
-.priority-btn-medium.active { background: var(--background-modifier-hover); color: var(--text-normal); font-weight: 700; }
-.priority-btn-high.active   { background: rgba(243, 156, 18, 0.12);  color: #f39c12; font-weight: 700; }
-.priority-btn-asap.active   { background: rgba(231, 76, 60, 0.15);   color: #e74c3c; font-weight: 700; }
+.priority-btn-low.active    { background: rgba(52, 152, 219, 0.12);  color: #3498db; border-color: #3498db; font-weight: 700; }
+.priority-btn-medium.active { background: var(--background-modifier-hover); color: var(--text-normal); border-color: var(--text-muted); font-weight: 700; }
+.priority-btn-high.active   { background: rgba(243, 156, 18, 0.12);  color: #f39c12; border-color: #f39c12; font-weight: 700; }
+.priority-btn-asap.active   { background: rgba(231, 76, 60, 0.15);   color: #e74c3c; border-color: #e74c3c; font-weight: 700; }
 
 /* ── 체크리스트 배지 ─────────────────────────────────────── */
 
