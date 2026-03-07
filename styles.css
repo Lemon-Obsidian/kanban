@@ -459,28 +459,21 @@
 }
 
 /* 카드 내용 */
-.kanban-card-title-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin-bottom: 5px;
-  /* 오른쪽 액션 버튼 공간 확보 */
+.kanban-card-title {
+  font-weight: 600;
+  line-height: 1.45;
+  font-size: 1em;
+  word-break: break-word;
+  margin-bottom: 6px;
+  /* 우측 액션 버튼 공간 */
   padding-right: 52px;
 }
 
-.kanban-card-title {
-  font-weight: 600;
-  line-height: 1.4;
-  font-size: 0.9em;
-  flex: 1;
-  word-break: break-word;
-}
-
 .kanban-card-content {
-  font-size: 0.79em;
+  font-size: 0.8em;
   color: var(--text-muted);
-  margin-bottom: 6px;
-  line-height: 1.45;
+  margin-bottom: 7px;
+  line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -488,20 +481,56 @@
 .kanban-card-due {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.75em;
+  gap: 3px;
+  font-size: 0.76em;
   color: var(--text-muted);
-  margin-bottom: 5px;
-}
-
-.kanban-card-due-icon .svg-icon {
-  width: 11px;
-  height: 11px;
+  margin-bottom: 6px;
+  font-weight: 500;
 }
 
 .kanban-card-due.overdue {
   color: #e74c3c;
-  font-weight: 600;
+  font-weight: 700;
+}
+
+/* 카드 인라인 체크리스트 */
+.kanban-card-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 7px;
+  padding: 6px 8px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.kanban-card-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+}
+
+.kanban-card-checklist-check {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+  margin: 0;
+}
+
+.kanban-card-checklist-text {
+  font-size: 0.82em;
+  line-height: 1.4;
+  color: var(--text-normal);
+  word-break: break-word;
+}
+
+.kanban-card-checklist-text.checked {
+  text-decoration: line-through;
+  color: var(--text-faint);
 }
 
 .kanban-card-tags {

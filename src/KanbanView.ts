@@ -2,7 +2,7 @@ import { ItemView, Menu, Modal, Notice, Setting, WorkspaceLeaf } from "obsidian"
 import { ArchivedCard, KanbanCard, KanbanColumn, KanbanSettings } from "./types";
 import { FileManager } from "./FileManager";
 import { CardModal } from "./CardModal";
-import { slugify, parseChecklist, priorityToNum } from "./utils";
+import { slugify, parseChecklist, formatChecklist, priorityToNum } from "./utils";
 
 export const VIEW_TYPE_KANBAN = "kanban-board-view";
 
@@ -481,34 +481,50 @@ export class KanbanView extends ItemView {
         }).open();
       });
 
-    // 제목 + 체크리스트 진행률
-    const titleRow = cardEl.createDiv("kanban-card-title-row");
-    titleRow.createDiv({ text: card.title, cls: "kanban-card-title" });
-
-    const { items: checklistItems } = parseChecklist(card.content);
-    if (checklistItems.length > 0) {
-      const checked = checklistItems.filter((i) => i.checked).length;
-      titleRow.createDiv({
-        text: `☑ ${checked}/${checklistItems.length}`,
-        cls: `kanban-checklist-progress${checked === checklistItems.length ? " complete" : ""}`,
-      });
-    }
+    // 제목
+    cardEl.createDiv({ text: card.title, cls: "kanban-card-title" });
 
     // 마감일
     if (card.due) {
       const today = new Date().toISOString().split("T")[0];
       const overdue = card.due < today;
       cardEl.createDiv({
-        text: `${overdue ? "⚠ " : "📅 "}${card.due}`,
+        text: `${overdue ? "⚠ 기한 초과 · " : "📅 "}${card.due}`,
         cls: `kanban-card-due${overdue ? " overdue" : ""}`,
       });
     }
 
-    // 텍스트 미리보기
-    const { text: textContent } = parseChecklist(card.content);
+    // 텍스트 미리보기 + 체크리스트
+    const { text: textContent, items: checklistItems } = parseChecklist(card.content);
     if (textContent) {
-      const preview = textContent.length > 80 ? textContent.slice(0, 80) + "..." : textContent;
+      const preview = textContent.length > 100 ? textContent.slice(0, 100) + "..." : textContent;
       cardEl.createDiv({ text: preview, cls: "kanban-card-content" });
+    }
+
+    // 체크리스트 인터랙티브 렌더링
+    if (checklistItems.length > 0) {
+      const checklistEl = cardEl.createDiv("kanban-card-checklist");
+      for (let i = 0; i < checklistItems.length; i++) {
+        const item = checklistItems[i];
+        const itemEl = checklistEl.createDiv("kanban-card-checklist-item");
+
+        const checkbox = itemEl.createEl("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = item.checked;
+        checkbox.className = "kanban-card-checklist-check";
+        checkbox.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          checklistItems[i].checked = checkbox.checked;
+          const newContent = [textContent, formatChecklist(checklistItems)].filter(Boolean).join("\n\n");
+          await this.fileManager.updateCard({ ...card, content: newContent });
+          await this.refresh();
+        });
+
+        itemEl.createSpan({
+          text: item.text,
+          cls: `kanban-card-checklist-text${item.checked ? " checked" : ""}`,
+        });
+      }
     }
 
     // 태그
