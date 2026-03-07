@@ -1003,6 +1003,57 @@
   border-top: 1px solid var(--background-modifier-border);
 }
 
+/* ── 태그 자동완성 ──────────────────────────────────────── */
+
+.kanban-tag-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.kanban-tag-text-input {
+  width: 100%;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.875em;
+  box-sizing: border-box;
+}
+
+.kanban-tag-text-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+.kanban-tag-dropdown {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0;
+  right: 0;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.kanban-tag-dropdown-item {
+  padding: 7px 12px;
+  font-size: 0.85em;
+  cursor: pointer;
+  color: var(--text-normal);
+  transition: background 0.1s ease;
+}
+
+.kanban-tag-dropdown-item:hover,
+.kanban-tag-dropdown-item.active {
+  background: var(--background-modifier-hover);
+  color: var(--interactive-accent);
+}
+
 /* ── 체크리스트 (모달) ───────────────────────────────────── */
 
 .kanban-checklist-section {

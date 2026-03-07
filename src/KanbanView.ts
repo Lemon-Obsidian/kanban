@@ -807,8 +807,13 @@ export class KanbanView extends ItemView {
     cardEl.addEventListener("click", () => this.openEditModal(card));
   }
 
+  private get allExistingTags(): string[] {
+    return [...new Set(this.cards.flatMap((c) => c.tags))].sort();
+  }
+
   private openAddModal(columnId: string) {
     new CardModal(this.app, {
+      existingTags: this.allExistingTags,
       onSubmit: async (data) => {
         await this.fileManager.createCard({ ...data, status: columnId });
         await this.refresh();
@@ -820,6 +825,7 @@ export class KanbanView extends ItemView {
   private openEditModal(card: KanbanCard) {
     new CardModal(this.app, {
       card,
+      existingTags: this.allExistingTags,
       onSubmit: async (data) => {
         await this.fileManager.updateCard({ ...card, ...data });
         await this.refresh();
@@ -1095,6 +1101,7 @@ export class KanbanView extends ItemView {
       if (flushedAt) {
         new CardModal(this.app, {
           card,
+          existingTags: this.allExistingTags,
           onSubmit: async (data) => {
             await this.fileManager.updateArchivedCard({ ...(card as ArchivedCard), ...data });
             this.archivedCards = await this.fileManager.loadArchivedCards();

@@ -4,6 +4,7 @@ import { parseTags, formatTags, ChecklistItem, parseChecklist, formatChecklist }
 
 interface CardModalOptions {
   card?: KanbanCard;
+  existingTags?: string[];
   onSubmit: (data: Omit<KanbanCard, "filePath">) => void;
 }
 
@@ -50,17 +51,91 @@ export class CardModal extends Modal {
         titleInput = text.inputEl;
       });
 
-    // Tags
-    new Setting(contentEl)
+    // Tags (with autocomplete)
+    const tagSetting = new Setting(contentEl)
       .setName("태그")
-      .setDesc("#태그1 #태그2 형식으로 입력")
-      .addText((text) => {
-        text
-          .setPlaceholder("#업무 #프로젝트...")
-          .setValue(this.tags)
-          .onChange((v) => (this.tags = v));
-        text.inputEl.style.width = "100%";
-      });
+      .setDesc("#태그1 #태그2 형식으로 입력");
+
+    const tagWrapper = tagSetting.controlEl.createDiv("kanban-tag-input-wrapper");
+    const tagInput = tagWrapper.createEl("input", { type: "text", cls: "kanban-tag-text-input" });
+    tagInput.placeholder = "#업무 #프로젝트...";
+    tagInput.value = this.tags;
+    tagInput.addEventListener("input", () => { this.tags = tagInput.value; updateDropdown(); });
+    tagInput.addEventListener("keydown", (e) => handleTagKeydown(e));
+    tagInput.addEventListener("blur", () => { setTimeout(() => dropdown.style.display = "none", 150); });
+
+    const dropdown = tagWrapper.createDiv("kanban-tag-dropdown");
+    dropdown.style.display = "none";
+
+    const existingTags = this.options.existingTags ?? [];
+    let activeIndex = -1;
+
+    const getActiveWord = () => {
+      const pos = tagInput.selectionStart ?? tagInput.value.length;
+      let start = pos;
+      while (start > 0 && tagInput.value[start - 1] !== " ") start--;
+      const word = tagInput.value.slice(start, pos);
+      return { word, start, end: pos };
+    };
+
+    const updateDropdown = () => {
+      const { word } = getActiveWord();
+      if (!word.startsWith("#") || word.length < 2) { dropdown.style.display = "none"; return; }
+      const query = word.slice(1).toLowerCase();
+      const alreadyUsed = new Set(parseTags(this.tags));
+      const matches = existingTags.filter(
+        (t) => t.toLowerCase().includes(query) && !alreadyUsed.has(t)
+      );
+      if (matches.length === 0) { dropdown.style.display = "none"; return; }
+
+      dropdown.empty();
+      activeIndex = -1;
+      for (let i = 0; i < matches.length; i++) {
+        const item = dropdown.createDiv({ text: `#${matches[i]}`, cls: "kanban-tag-dropdown-item" });
+        item.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          selectTag(matches[i]);
+        });
+      }
+      dropdown.style.display = "block";
+    };
+
+    const selectTag = (tag: string) => {
+      const { start, end } = getActiveWord();
+      const before = tagInput.value.slice(0, start);
+      const after = tagInput.value.slice(end);
+      tagInput.value = `${before}#${tag} ${after.trimStart()}`;
+      this.tags = tagInput.value;
+      const newPos = start + tag.length + 2;
+      tagInput.setSelectionRange(newPos, newPos);
+      tagInput.focus();
+      dropdown.style.display = "none";
+      activeIndex = -1;
+    };
+
+    const handleTagKeydown = (e: KeyboardEvent) => {
+      const items = dropdown.querySelectorAll<HTMLElement>(".kanban-tag-dropdown-item");
+      if (dropdown.style.display === "none" || items.length === 0) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeIndex = (activeIndex + 1) % items.length;
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeIndex = (activeIndex - 1 + items.length) % items.length;
+      } else if (e.key === "Enter" && activeIndex >= 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        const tag = items[activeIndex].textContent!.slice(1);
+        selectTag(tag);
+        return;
+      } else if (e.key === "Escape") {
+        dropdown.style.display = "none";
+        return;
+      } else {
+        return;
+      }
+      items.forEach((el, i) => el.classList.toggle("active", i === activeIndex));
+    };
 
     // Due date
     new Setting(contentEl).setName("마감일").addText((text) => {
