@@ -32,8 +32,8 @@ class AddColumnModal extends Modal {
     });
 
     new Setting(contentEl)
-      .setName("Flush 가능")
-      .setDesc("이 컬럼의 카드를 일괄 아카이브할 수 있습니다")
+      .setName("보관 가능")
+      .setDesc("이 컬럼의 카드를 일괄 아카이브로 보관할 수 있습니다")
       .addToggle((t) => t.setValue(false).onChange((v) => (this.flushable = v)));
 
     const btnRow = contentEl.createDiv("kanban-modal-buttons");
@@ -77,14 +77,14 @@ class FlushConfirmModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h2", { text: "컬럼 Flush" });
+    contentEl.createEl("h2", { text: "카드 보관" });
     contentEl.createEl("p", {
-      text: `"${this.columnLabel}" 컬럼의 카드 ${this.count}개를 아카이브로 이동합니다. 계속하시겠습니까?`,
+      text: `"${this.columnLabel}" 컬럼의 카드 ${this.count}개를 아카이브로 보관합니다. 계속하시겠습니까?`,
     });
 
     const btnRow = contentEl.createDiv("kanban-modal-buttons");
     btnRow.createEl("button", { text: "취소" }).addEventListener("click", () => this.close());
-    const confirmBtn = btnRow.createEl("button", { text: "Flush", cls: "mod-warning" });
+    const confirmBtn = btnRow.createEl("button", { text: "보관하기", cls: "mod-warning" });
     confirmBtn.addEventListener("click", () => {
       this.onConfirm();
       this.close();
@@ -228,9 +228,9 @@ export class KanbanView extends ItemView {
 
     if (flushable && filtered.length > 0) {
       const flushBtn = colHeader.createEl("button", {
-        text: `🗃 Flush (${filtered.length})`,
+        text: `🗃 보관 (${filtered.length})`,
         cls: "kanban-flush-btn",
-        title: "카드를 아카이브로 이동",
+        title: "카드를 아카이브로 보관",
       });
       flushBtn.addEventListener("click", () => this.openFlushModal(columnId, label, filtered.length));
     }
@@ -241,6 +241,37 @@ export class KanbanView extends ItemView {
       title: "새 카드 추가",
     });
     addBtn.addEventListener("click", () => this.openAddModal(columnId));
+
+    // 컬럼 옵션 메뉴 (···)
+    const menuBtn = colHeader.createEl("button", {
+      text: "···",
+      cls: "kanban-col-menu-btn",
+      title: "컬럼 옵션",
+    });
+    menuBtn.addEventListener("click", (e) => {
+      const menu = new Menu();
+      menu.addItem((item) =>
+        item
+          .setTitle("컬럼 삭제")
+          .setIcon("trash")
+          .onClick(async () => {
+            if (this.settings.columns.length <= 1) {
+              new Notice("최소 1개의 컬럼이 필요합니다.");
+              return;
+            }
+            if (filtered.length > 0) {
+              new Notice(`카드 ${filtered.length}개를 먼저 이동하거나 보관하세요.`);
+              return;
+            }
+            if (!confirm(`"${label}" 컬럼을 삭제할까요?`)) return;
+            this.settings.columns = this.settings.columns.filter((c) => c.id !== columnId);
+            await this.saveSettings();
+            await this.refresh();
+            new Notice(`"${label}" 컬럼이 삭제되었습니다.`);
+          })
+      );
+      menu.showAtMouseEvent(e);
+    });
 
     const cardsEl = col.createDiv("kanban-cards");
 
@@ -375,7 +406,7 @@ export class KanbanView extends ItemView {
   private openFlushModal(columnId: string, label: string, count: number) {
     new FlushConfirmModal(this.app, label, count, async () => {
       const flushed = await this.fileManager.flushColumn(columnId);
-      new Notice(`${flushed}개의 카드가 아카이브로 이동되었습니다.`);
+      new Notice(`${flushed}개의 카드가 아카이브에 보관되었습니다.`);
       await this.refresh();
     }).open();
   }

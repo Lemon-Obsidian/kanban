@@ -137,7 +137,7 @@ class KanbanSettingTab extends PluginSettingTab {
     // ── 컬럼 관리 ──
     containerEl.createEl("h3", { text: "컬럼 관리" });
     containerEl.createEl("p", {
-      text: "컬럼 순서대로 보드에 표시됩니다. Flush 가능 컬럼은 보드에서 일괄 아카이브할 수 있습니다.",
+      text: "컬럼 순서대로 보드에 표시됩니다. 보관 가능 컬럼은 보드에서 카드를 일괄 아카이브로 보관할 수 있습니다.",
       cls: "setting-item-description",
     });
 
@@ -158,10 +158,10 @@ class KanbanSettingTab extends PluginSettingTab {
         })
       );
 
-      // Flush 가능 토글
+      // 보관 가능 토글
       setting.addToggle((toggle) =>
         toggle
-          .setTooltip("Flush 가능")
+          .setTooltip("보관 가능")
           .setValue(col.flushable ?? false)
           .onChange(async (v) => {
             cols[i].flushable = v;
@@ -242,8 +242,8 @@ class KanbanSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Flush 가능")
-      .setDesc("이 컬럼의 카드를 일괄 아카이브(Flush)할 수 있습니다")
+      .setName("보관 가능")
+      .setDesc("이 컬럼의 카드를 일괄 아카이브로 보관할 수 있습니다")
       .addToggle((toggle) =>
         toggle
           .setValue(this.newColFlushable)

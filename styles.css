@@ -442,6 +442,32 @@
   border-color: #e74c3c;
 }
 
+/* 컬럼 옵션 메뉴 버튼 */
+.kanban-col-menu-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.kanban-column-header:hover .kanban-col-menu-btn {
+  opacity: 1;
+}
+
+.kanban-col-menu-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
 /* + 컬럼 추가 */
 .kanban-add-column-placeholder {
   min-width: 180px;
