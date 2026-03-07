@@ -255,6 +255,9 @@ export class KanbanView extends ItemView {
   private sortDir: "asc" | "desc" = "desc";
   private boardColumnsEl: HTMLElement | null = null;
   private statsBarEl: HTMLElement | null = null;
+  private detailPanelEl: HTMLElement | null = null;
+  private searchInputEl: HTMLInputElement | null = null;
+  private selectedCard: KanbanCard | null = null;
 
   private draggedColumnId: string | null = null;
   private viewMode: ViewMode = "board";
@@ -283,11 +286,18 @@ export class KanbanView extends ItemView {
   getDisplayText() { return "Kanban Board"; }
   getIcon() { return "columns"; }
 
-  async onOpen() { await this.refresh(); }
+  async onOpen() {
+    await this.refresh();
+    this.registerDomEvent(this.containerEl, "keydown", (e: KeyboardEvent) => this.handleKeydown(e));
+  }
 
   async refresh() {
     if (this.viewMode === "board" || this.viewMode === "upcoming") {
       this.cards = await this.fileManager.loadCards();
+      // 편집/이동 후 selectedCard를 최신 데이터로 갱신
+      if (this.selectedCard) {
+        this.selectedCard = this.cards.find((c) => c.filePath === this.selectedCard!.filePath) ?? null;
+      }
     } else {
       this.archivedCards = await this.fileManager.loadArchivedCards();
     }
@@ -306,9 +316,14 @@ export class KanbanView extends ItemView {
     const { containerEl } = this;
     containerEl.empty();
     this.boardColumnsEl = null;
+    this.statsBarEl = null;
+    this.searchInputEl = null;
+    this.detailPanelEl = null;
     containerEl.addClass("kanban-container");
 
-    const header = containerEl.createDiv("kanban-header");
+    // 메인 영역 (헤더 + 보드 컬럼)
+    const mainArea = containerEl.createDiv("kanban-main-area");
+    const header = mainArea.createDiv("kanban-header");
 
     const titleRow = header.createDiv("kanban-header-title-row");
 
@@ -365,7 +380,8 @@ export class KanbanView extends ItemView {
       type: "text",
       cls: "kanban-search-input",
     });
-    searchInput.placeholder = "🔍  카드 검색 (제목, 내용, 태그)...";
+    searchInput.placeholder = "🔍  카드 검색 (제목, 내용, 태그)...    [/]";
+    this.searchInputEl = searchInput;
     searchInput.value = this.boardSearch;
     searchInput.addEventListener("input", (e) => {
       this.boardSearch = (e.target as HTMLInputElement).value;
@@ -411,8 +427,26 @@ export class KanbanView extends ItemView {
 
     this.statsBarEl = header.createDiv("kanban-stats-bar");
 
-    this.boardColumnsEl = containerEl.createDiv("kanban-board");
+    // 단축키 힌트 바
+    const shortcutBar = header.createDiv("kanban-shortcut-bar");
+    for (const { key, label } of [
+      { key: "N", label: "새 카드" },
+      { key: "/", label: "검색" },
+      { key: "E", label: "편집" },
+      { key: "Del", label: "삭제" },
+      { key: "Esc", label: "닫기" },
+    ]) {
+      const item = shortcutBar.createSpan("kanban-shortcut-item");
+      item.createEl("kbd", { text: key, cls: "kanban-kbd" });
+      item.createSpan({ text: " " + label });
+    }
+
+    this.boardColumnsEl = mainArea.createDiv("kanban-board");
     this.renderBoardColumns();
+
+    // 상세 패널
+    this.detailPanelEl = containerEl.createDiv("kanban-detail-panel");
+    if (this.selectedCard) this.renderDetailPanel(this.selectedCard);
   }
 
   private renderBoardColumns() {
@@ -853,7 +887,7 @@ export class KanbanView extends ItemView {
       menu.showAtMouseEvent(e);
     });
 
-    cardEl.addEventListener("click", () => this.openEditModal(card));
+    cardEl.addEventListener("click", () => this.openDetailPanel(card));
   }
 
   private get allExistingTags(): string[] {
@@ -1193,6 +1227,168 @@ export class KanbanView extends ItemView {
         this.openEditModal(card);
       }
     });
+  }
+
+  // ── 키보드 단축키 ─────────────────────────────────────────────────────────
+
+  private handleKeydown(e: KeyboardEvent) {
+    if (this.viewMode !== "board") return;
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+
+    switch (e.key) {
+      case "n":
+      case "N": {
+        e.preventDefault();
+        const firstCol = this.activeBoard.columns[0];
+        if (firstCol) this.openAddModal(firstCol.id);
+        break;
+      }
+      case "e":
+      case "E":
+        if (this.selectedCard) { e.preventDefault(); this.openEditModal(this.selectedCard); }
+        break;
+      case "Delete":
+        if (this.selectedCard) {
+          e.preventDefault();
+          const card = this.selectedCard;
+          new ConfirmModal(this.app, {
+            title: "카드 삭제",
+            message: `"${card.title}" 카드를 삭제할까요?`,
+            confirmText: "삭제",
+            danger: true,
+            onConfirm: async () => {
+              await this.fileManager.deleteCard(card);
+              this.selectedCard = null;
+              await this.refresh();
+            },
+          }).open();
+        }
+        break;
+      case "/":
+        e.preventDefault();
+        this.searchInputEl?.focus();
+        break;
+      case "Escape":
+        if (this.selectedCard) { e.preventDefault(); this.closeDetailPanel(); }
+        break;
+    }
+  }
+
+  // ── 카드 상세 패널 ────────────────────────────────────────────────────────
+
+  private openDetailPanel(card: KanbanCard) {
+    this.selectedCard = card;
+    this.containerEl.addClass("has-detail-panel");
+    if (this.detailPanelEl) this.renderDetailPanel(card);
+  }
+
+  private closeDetailPanel() {
+    this.selectedCard = null;
+    this.containerEl.removeClass("has-detail-panel");
+    if (this.detailPanelEl) {
+      this.detailPanelEl.removeClass("is-open");
+      this.detailPanelEl.empty();
+    }
+  }
+
+  private renderDetailPanel(card: KanbanCard) {
+    if (!this.detailPanelEl) return;
+    this.detailPanelEl.empty();
+    this.detailPanelEl.addClass("is-open");
+    this.containerEl.addClass("has-detail-panel");
+
+    // 헤더
+    const panelHeader = this.detailPanelEl.createDiv("kanban-detail-header");
+    panelHeader.createSpan({ text: "카드 상세", cls: "kanban-detail-header-title" });
+    panelHeader.createEl("button", { text: "✕", cls: "kanban-detail-close-btn", title: "닫기 (Esc)" })
+      .addEventListener("click", () => this.closeDetailPanel());
+
+    // 바디
+    const body = this.detailPanelEl.createDiv("kanban-detail-body");
+
+    body.createDiv({ text: card.title, cls: "kanban-detail-card-title" });
+
+    // 배지 (컬럼 + 우선순위 + 반복)
+    const meta = body.createDiv("kanban-detail-meta");
+    const colLabel = this.activeBoard.columns.find((c) => c.id === card.status)?.label ?? card.status;
+    meta.createSpan({ text: colLabel, cls: "kanban-detail-badge kanban-detail-col-badge" });
+    if (card.priority && card.priority !== "medium") {
+      const pLabel: Record<string, string> = { low: "🔵 낮음", high: "🔴 높음", asap: "🚨 ASAP" };
+      meta.createSpan({ text: pLabel[card.priority], cls: `kanban-detail-badge priority-badge-${card.priority}` });
+    }
+    if (card.recur) {
+      const rLabel: Record<string, string> = { daily: "🔁 매일", weekly: "🔁 매주", monthly: "🔁 매월" };
+      meta.createSpan({ text: rLabel[card.recur], cls: "kanban-detail-badge" });
+    }
+
+    // 마감일
+    if (card.due) {
+      const today = new Date().toISOString().split("T")[0];
+      const overdue = card.due < today;
+      body.createDiv({
+        text: `📅 ${card.due}까지${overdue ? " (기한 초과)" : ""}`,
+        cls: `kanban-detail-due${overdue ? " overdue" : ""}`,
+      });
+    }
+
+    // 태그
+    if (card.tags.length > 0) {
+      const tagsEl = body.createDiv("kanban-detail-tags");
+      for (const tag of card.tags) tagsEl.createSpan({ text: `#${tag}`, cls: "kanban-tag" });
+    }
+
+    body.createDiv({ cls: "kanban-detail-divider" });
+
+    // 본문
+    const { text: textContent, items: checklistItems } = parseChecklist(card.content);
+    if (textContent) {
+      const contentEl = body.createDiv("kanban-detail-content");
+      this.renderContentWithLinks(contentEl, textContent, "");
+    }
+
+    // 체크리스트 (전체, 인터랙티브)
+    if (checklistItems.length > 0) {
+      const done = checklistItems.filter((i) => i.checked).length;
+      const clSection = body.createDiv("kanban-detail-checklist-section");
+      clSection.createDiv({ text: `체크리스트  ${done}/${checklistItems.length}`, cls: "kanban-detail-checklist-header" });
+      for (let i = 0; i < checklistItems.length; i++) {
+        const item = checklistItems[i];
+        const itemEl = clSection.createDiv("kanban-card-checklist-item");
+        const cb = itemEl.createEl("input");
+        cb.type = "checkbox";
+        cb.checked = item.checked;
+        cb.className = "kanban-card-checklist-check";
+        cb.addEventListener("click", async (ev) => {
+          ev.stopPropagation();
+          checklistItems[i].checked = cb.checked;
+          const newContent = [textContent, formatChecklist(checklistItems)].filter(Boolean).join("\n\n");
+          await this.fileManager.updateCard({ ...card, content: newContent });
+          await this.refresh();
+        });
+        const span = itemEl.createSpan({ cls: `kanban-card-checklist-text${item.checked ? " checked" : ""}` });
+        this.renderContentWithLinks(span, item.text, "");
+      }
+    }
+
+    // 날짜
+    const createdMs = new Date(card.created).getTime();
+    const datesEl = body.createDiv("kanban-detail-dates");
+    datesEl.createSpan({ text: `생성 ${relativeTime(createdMs)}` });
+    if (card.mtime && Math.abs(card.mtime - createdMs) > 60_000) {
+      datesEl.createSpan({ text: " · " });
+      datesEl.createSpan({ text: `수정 ${relativeTime(card.mtime)}` });
+    }
+
+    // 푸터 (편집 버튼 + 키보드 힌트)
+    const footer = this.detailPanelEl.createDiv("kanban-detail-footer");
+    footer.createEl("button", { text: "✎ 편집", cls: "mod-cta kanban-detail-edit-btn", title: "E" })
+      .addEventListener("click", () => this.openEditModal(card));
+    const hints = footer.createDiv("kanban-detail-kbd-hints");
+    for (const { key, label } of [{ key: "E", label: "편집" }, { key: "Del", label: "삭제" }, { key: "Esc", label: "닫기" }]) {
+      hints.createEl("kbd", { text: key, cls: "kanban-kbd" });
+      hints.createSpan({ text: " " + label + "  " });
+    }
   }
 
   // ── 헬퍼 ─────────────────────────────────────────────────────────────────
