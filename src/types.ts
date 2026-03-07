@@ -2,7 +2,7 @@ export interface KanbanCard {
   title: string;
   tags: string[];
   due?: string;
-  priority?: "low" | "medium" | "high";
+  priority?: "low" | "medium" | "high" | "asap";
   created: string;
   content: string;
   filePath: string;

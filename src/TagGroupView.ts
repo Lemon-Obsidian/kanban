@@ -145,6 +145,7 @@ export class TagGroupView extends ItemView {
       low: "🔵",
       medium: "🟡",
       high: "🔴",
+      asap: "🚨",
     };
 
     for (const card of cards) {

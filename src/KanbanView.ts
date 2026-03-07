@@ -1,9 +1,67 @@
-import { ItemView, Menu, Modal, Notice, WorkspaceLeaf } from "obsidian";
-import { ArchivedCard, KanbanCard, KanbanSettings } from "./types";
+import { ItemView, Menu, Modal, Notice, Setting, WorkspaceLeaf } from "obsidian";
+import { ArchivedCard, KanbanCard, KanbanColumn, KanbanSettings } from "./types";
 import { FileManager } from "./FileManager";
 import { CardModal } from "./CardModal";
+import { slugify } from "./utils";
 
 export const VIEW_TYPE_KANBAN = "kanban-board-view";
+
+// ── AddColumnModal ────────────────────────────────────────────────────────
+
+class AddColumnModal extends Modal {
+  private name = "";
+  private flushable = false;
+
+  constructor(
+    app: Parameters<typeof Modal["prototype"]["constructor"]>[0],
+    private existingIds: string[],
+    private onAdd: (col: KanbanColumn) => void
+  ) {
+    super(app);
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "새 컬럼 추가" });
+
+    let nameInput: HTMLInputElement;
+    new Setting(contentEl).setName("컬럼 이름").addText((text) => {
+      text.setPlaceholder("예: 리뷰, Backlog...").onChange((v) => (this.name = v));
+      nameInput = text.inputEl;
+      nameInput.style.width = "100%";
+    });
+
+    new Setting(contentEl)
+      .setName("Flush 가능")
+      .setDesc("이 컬럼의 카드를 일괄 아카이브할 수 있습니다")
+      .addToggle((t) => t.setValue(false).onChange((v) => (this.flushable = v)));
+
+    const btnRow = contentEl.createDiv("kanban-modal-buttons");
+    btnRow.createEl("button", { text: "취소" }).addEventListener("click", () => this.close());
+    btnRow.createEl("button", { text: "추가", cls: "mod-cta" })
+      .addEventListener("click", () => this.submit());
+
+    setTimeout(() => nameInput?.focus(), 50);
+    contentEl.addEventListener("keydown", (e) => { if (e.key === "Enter") this.submit(); });
+  }
+
+  private submit() {
+    const name = this.name.trim();
+    if (!name) { new Notice("컬럼 이름을 입력하세요."); return; }
+
+    let id = slugify(name) || `col-${Date.now()}`;
+    if (this.existingIds.includes(id)) {
+      let n = 2;
+      while (this.existingIds.includes(`${id}-${n}`)) n++;
+      id = `${id}-${n}`;
+    }
+
+    this.onAdd({ id, label: name, flushable: this.flushable });
+    this.close();
+  }
+
+  onClose() { this.contentEl.empty(); }
+}
 
 // ── Flush 확인 모달 ───────────────────────────────────────────────────────
 
@@ -57,7 +115,8 @@ export class KanbanView extends ItemView {
   constructor(
     leaf: WorkspaceLeaf,
     private fileManager: FileManager,
-    private settings: KanbanSettings
+    private settings: KanbanSettings,
+    private saveSettings: () => Promise<void>
   ) {
     super(leaf);
   }
@@ -107,6 +166,23 @@ export class KanbanView extends ItemView {
     for (const col of this.settings.columns) {
       this.renderColumn(board, col.id, col.label, col.flushable ?? false);
     }
+
+    // + 컬럼 추가 버튼
+    const addColPlaceholder = board.createDiv("kanban-add-column-placeholder");
+    addColPlaceholder.createDiv({ text: "+ 컬럼 추가", cls: "kanban-add-column-label" });
+    addColPlaceholder.addEventListener("click", () => {
+      new AddColumnModal(
+        this.app,
+        this.settings.columns.map((c) => c.id),
+        async (newCol) => {
+          this.settings.columns.push(newCol);
+          await this.saveSettings();
+          await this.fileManager.ensureFolders();
+          await this.refresh();
+          new Notice(`"${newCol.label}" 컬럼이 추가되었습니다.`);
+        }
+      ).open();
+    });
   }
 
   private renderTagFilterBar(parent: HTMLElement) {
@@ -152,10 +228,10 @@ export class KanbanView extends ItemView {
 
     if (flushable && filtered.length > 0) {
       const flushBtn = colHeader.createEl("button", {
+        text: `🗃 Flush (${filtered.length})`,
         cls: "kanban-flush-btn",
-        title: "이 컬럼을 Flush하여 아카이브로 이동",
+        title: "카드를 아카이브로 이동",
       });
-      flushBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`;
       flushBtn.addEventListener("click", () => this.openFlushModal(columnId, label, filtered.length));
     }
 

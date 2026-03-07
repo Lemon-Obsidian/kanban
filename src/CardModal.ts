@@ -11,7 +11,7 @@ export class CardModal extends Modal {
   private title = "";
   private tags = "";
   private due = "";
-  private priority: "" | "low" | "medium" | "high" = "";
+  private priority: "low" | "medium" | "high" | "asap" = "medium";
   private content = "";
 
   constructor(app: App, private options: CardModalOptions) {
@@ -20,7 +20,7 @@ export class CardModal extends Modal {
       this.title = options.card.title;
       this.tags = formatTags(options.card.tags);
       this.due = options.card.due ?? "";
-      this.priority = options.card.priority ?? "";
+      this.priority = options.card.priority ?? "medium";
       this.content = options.card.content;
     }
   }
@@ -65,16 +65,28 @@ export class CardModal extends Modal {
       text.setValue(this.due).onChange((v) => (this.due = v));
     });
 
-    // Priority
-    new Setting(contentEl).setName("우선순위").addDropdown((drop) => {
-      drop
-        .addOption("", "없음")
-        .addOption("low", "낮음 🔵")
-        .addOption("medium", "보통 🟡")
-        .addOption("high", "높음 🔴")
-        .setValue(this.priority)
-        .onChange((v) => (this.priority = v as typeof this.priority));
-    });
+    // Priority — 세그먼트 토글
+    const priorityOptions: { value: typeof this.priority; label: string }[] = [
+      { value: "low",    label: "낮음" },
+      { value: "medium", label: "중간" },
+      { value: "high",   label: "높음" },
+      { value: "asap",   label: "ASAP" },
+    ];
+
+    const prioritySetting = new Setting(contentEl).setName("우선순위");
+    const toggleGroup = prioritySetting.controlEl.createDiv("kanban-priority-toggle");
+
+    for (const opt of priorityOptions) {
+      const btn = toggleGroup.createEl("button", {
+        text: opt.label,
+        cls: `kanban-priority-btn priority-btn-${opt.value}${this.priority === opt.value ? " active" : ""}`,
+      });
+      btn.addEventListener("click", () => {
+        this.priority = opt.value;
+        toggleGroup.querySelectorAll(".kanban-priority-btn").forEach((b) => b.removeClass("active"));
+        btn.addClass("active");
+      });
+    }
 
     // Content
     new Setting(contentEl).setName("내용").addTextArea((area) => {
@@ -106,7 +118,7 @@ export class CardModal extends Modal {
         title: this.title.trim(),
         tags: parseTags(this.tags),
         due: this.due || undefined,
-        priority: this.priority || undefined,
+        priority: this.priority,
         created: this.options.card?.created ?? new Date().toISOString(),
         content: this.content,
         status: this.options.card?.status ?? "todo",

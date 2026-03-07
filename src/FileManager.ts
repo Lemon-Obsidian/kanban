@@ -90,7 +90,7 @@ export class FileManager {
       tags: Array.isArray(fm.tags) ? (fm.tags as string[]) : [],
       due: typeof fm.due === "string" ? fm.due : undefined,
       priority:
-        fm.priority === "low" || fm.priority === "medium" || fm.priority === "high"
+        fm.priority === "low" || fm.priority === "medium" || fm.priority === "high" || fm.priority === "asap"
           ? fm.priority
           : undefined,
       created:

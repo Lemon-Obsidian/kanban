@@ -375,28 +375,97 @@
   font-size: 0.9em;
 }
 
+/* ===== 우선순위 토글 ===== */
+
+.kanban-priority-toggle {
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.kanban-priority-btn {
+  flex: 1;
+  padding: 5px 0;
+  border: none;
+  background: var(--background-secondary);
+  cursor: pointer;
+  font-size: 0.82em;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: background 0.15s ease, color 0.15s ease;
+  border-right: 1px solid var(--background-modifier-border);
+}
+
+.kanban-priority-btn:last-child {
+  border-right: none;
+}
+
+.kanban-priority-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.priority-btn-low.active    { background: #3498db22; color: #3498db; font-weight: 700; }
+.priority-btn-medium.active { background: #95a5a622; color: var(--text-normal); font-weight: 700; }
+.priority-btn-high.active   { background: #f39c1222; color: #f39c12; font-weight: 700; }
+.priority-btn-asap.active   { background: #e74c3c33; color: #e74c3c; font-weight: 700; }
+
+/* 카드 왼쪽 우선순위 바 */
+.kanban-card.priority-asap {
+  border-left: 3px solid #e74c3c;
+  animation: asap-pulse 2s ease-in-out infinite;
+}
+
+@keyframes asap-pulse {
+  0%, 100% { border-left-color: #e74c3c; }
+  50%       { border-left-color: #ff8a80; }
+}
+
 /* ===== Flush 버튼 ===== */
 
 .kanban-flush-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  border: 1px solid var(--color-base-30);
-  background: transparent;
-  color: var(--text-muted);
+  padding: 2px 9px;
+  border-radius: 5px;
+  border: 1px solid rgba(231, 76, 60, 0.4);
+  background: rgba(231, 76, 60, 0.08);
+  color: #e74c3c;
   cursor: pointer;
+  font-size: 0.75em;
+  font-weight: 600;
   flex-shrink: 0;
   transition: all 0.15s ease;
-  margin-right: 2px;
+  margin-right: 4px;
 }
 
 .kanban-flush-btn:hover {
-  background: rgba(231, 76, 60, 0.12);
+  background: rgba(231, 76, 60, 0.18);
   border-color: #e74c3c;
-  color: #e74c3c;
+}
+
+/* + 컬럼 추가 */
+.kanban-add-column-placeholder {
+  min-width: 180px;
+  max-width: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--background-modifier-border);
+  border-radius: 10px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.kanban-add-column-placeholder:hover {
+  opacity: 1;
+  border-color: var(--interactive-accent);
+}
+
+.kanban-add-column-label {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  user-select: none;
 }
 
 /* ===== 아카이브 뷰 ===== */

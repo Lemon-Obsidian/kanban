@@ -23,7 +23,7 @@ export default class KanbanPlugin extends Plugin {
 
     this.registerView(
       VIEW_TYPE_KANBAN,
-      (leaf) => new KanbanView(leaf, this.fileManager, this.settings)
+      (leaf) => new KanbanView(leaf, this.fileManager, this.settings, () => this.saveSettings())
     );
     this.registerView(
       VIEW_TYPE_TAG_GROUP,
