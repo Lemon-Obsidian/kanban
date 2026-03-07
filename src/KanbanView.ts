@@ -2,7 +2,7 @@ import { ItemView, Menu, Modal, Notice, Setting, WorkspaceLeaf } from "obsidian"
 import { ArchivedCard, KanbanCard, KanbanColumn, KanbanSettings } from "./types";
 import { FileManager } from "./FileManager";
 import { CardModal } from "./CardModal";
-import { slugify } from "./utils";
+import { slugify, parseChecklist, priorityToNum } from "./utils";
 
 export const VIEW_TYPE_KANBAN = "kanban-board-view";
 
@@ -96,13 +96,17 @@ class FlushConfirmModal extends Modal {
 
 // ── KanbanView ────────────────────────────────────────────────────────────
 
-type ViewMode = "board" | "archive";
+type ViewMode = "board" | "archive" | "upcoming";
+type SortBy = "created" | "due" | "priority" | "title";
 
 export class KanbanView extends ItemView {
   // Board state
   private cards: KanbanCard[] = [];
   private draggedCard: KanbanCard | null = null;
   private activeTagFilter: string | null = null;
+  private boardSearch = "";
+  private sortBy: SortBy = "created";
+  private sortDir: "asc" | "desc" = "desc";
 
   // Archive state
   private viewMode: ViewMode = "board";
@@ -128,7 +132,7 @@ export class KanbanView extends ItemView {
   async onOpen() { await this.refresh(); }
 
   async refresh() {
-    if (this.viewMode === "board") {
+    if (this.viewMode === "board" || this.viewMode === "upcoming") {
       this.cards = await this.fileManager.loadCards();
     } else {
       this.archivedCards = await this.fileManager.loadArchivedCards();
@@ -138,7 +142,8 @@ export class KanbanView extends ItemView {
 
   private render() {
     if (this.viewMode === "board") this.renderBoard();
-    else this.renderArchive();
+    else if (this.viewMode === "archive") this.renderArchive();
+    else this.renderUpcoming();
   }
 
   // ── 보드 뷰 ─────────────────────────────────────────────────────────────
@@ -153,12 +158,62 @@ export class KanbanView extends ItemView {
     const titleRow = header.createDiv("kanban-header-title-row");
     titleRow.createEl("h1", { text: "Kanban Board", cls: "kanban-title" });
 
-    const archiveBtn = titleRow.createEl("button", {
+    const headerBtns = titleRow.createDiv("kanban-header-btns");
+    const upcomingBtn = headerBtns.createEl("button", {
+      text: "마감 임박",
+      cls: "kanban-upcoming-open-btn",
+      title: "마감일 기준으로 카드 보기",
+    });
+    upcomingBtn.addEventListener("click", () => this.switchToUpcoming());
+
+    const archiveBtn = headerBtns.createEl("button", {
       text: "아카이브",
       cls: "kanban-archive-open-btn",
       title: "아카이브 히스토리 보기",
     });
     archiveBtn.addEventListener("click", () => this.switchToArchive());
+
+    // 검색 + 정렬 컨트롤
+    const controlsRow = header.createDiv("kanban-controls-row");
+
+    const searchInput = controlsRow.createEl("input", {
+      type: "text",
+      cls: "kanban-search-input",
+    });
+    searchInput.placeholder = "카드 검색 (제목, 내용, 태그)...";
+    searchInput.value = this.boardSearch;
+    searchInput.addEventListener("input", (e) => {
+      this.boardSearch = (e.target as HTMLInputElement).value;
+      this.render();
+    });
+
+    const sortGroup = controlsRow.createDiv("kanban-sort-group");
+    sortGroup.createSpan({ text: "정렬:", cls: "kanban-filter-label" });
+
+    const sortOptions: { value: SortBy; label: string }[] = [
+      { value: "created",  label: "생성일" },
+      { value: "due",      label: "마감일" },
+      { value: "priority", label: "우선순위" },
+      { value: "title",    label: "제목" },
+    ];
+
+    for (const opt of sortOptions) {
+      const isActive = this.sortBy === opt.value;
+      const dirIcon = isActive ? (this.sortDir === "desc" ? " ↓" : " ↑") : "";
+      const btn = sortGroup.createEl("button", {
+        text: opt.label + dirIcon,
+        cls: `kanban-sort-btn${isActive ? " active" : ""}`,
+      });
+      btn.addEventListener("click", () => {
+        if (this.sortBy === opt.value) {
+          this.sortDir = this.sortDir === "desc" ? "asc" : "desc";
+        } else {
+          this.sortBy = opt.value;
+          this.sortDir = opt.value === "created" ? "desc" : "asc";
+        }
+        this.render();
+      });
+    }
 
     this.renderTagFilterBar(header);
 
@@ -301,7 +356,39 @@ export class KanbanView extends ItemView {
     if (this.activeTagFilter) {
       cards = cards.filter((c) => c.tags.includes(this.activeTagFilter!));
     }
-    return cards;
+    if (this.boardSearch) {
+      const q = this.boardSearch.toLowerCase();
+      cards = cards.filter((c) =>
+        c.title.toLowerCase().includes(q) ||
+        c.content.toLowerCase().includes(q) ||
+        c.tags.some((t) => t.toLowerCase().includes(q))
+      );
+    }
+    return this.sortCards(cards);
+  }
+
+  private sortCards(cards: KanbanCard[]): KanbanCard[] {
+    return [...cards].sort((a, b) => {
+      let cmp = 0;
+      switch (this.sortBy) {
+        case "created":
+          cmp = a.created > b.created ? 1 : a.created < b.created ? -1 : 0;
+          break;
+        case "due": {
+          const aDue = a.due ?? "9999-99-99";
+          const bDue = b.due ?? "9999-99-99";
+          cmp = aDue > bDue ? 1 : aDue < bDue ? -1 : 0;
+          break;
+        }
+        case "priority":
+          cmp = priorityToNum(a.priority) - priorityToNum(b.priority);
+          break;
+        case "title":
+          cmp = a.title.localeCompare(b.title, "ko");
+          break;
+      }
+      return this.sortDir === "asc" ? cmp : -cmp;
+    });
   }
 
   private renderCard(parent: HTMLElement, card: KanbanCard) {
@@ -315,19 +402,32 @@ export class KanbanView extends ItemView {
     });
     cardEl.addEventListener("dragend", () => cardEl.removeClass("dragging"));
 
-    cardEl.createDiv({ text: card.title, cls: "kanban-card-title" });
+    const titleRow = cardEl.createDiv("kanban-card-title-row");
+    titleRow.createDiv({ text: card.title, cls: "kanban-card-title" });
+
+    // 체크리스트 진행률 배지
+    const { items: checklistItems } = parseChecklist(card.content);
+    if (checklistItems.length > 0) {
+      const checked = checklistItems.filter((i) => i.checked).length;
+      titleRow.createDiv({
+        text: `☑ ${checked}/${checklistItems.length}`,
+        cls: `kanban-checklist-progress${checked === checklistItems.length ? " complete" : ""}`,
+      });
+    }
 
     if (card.due) {
       const today = new Date().toISOString().split("T")[0];
-      const overdue = card.due < today && card.status !== "done";
+      const overdue = card.due < today;
       cardEl.createDiv({
         text: `📅 ${card.due}`,
         cls: `kanban-card-due ${overdue ? "overdue" : ""}`,
       });
     }
 
-    if (card.content) {
-      const preview = card.content.length > 80 ? card.content.slice(0, 80) + "..." : card.content;
+    // 체크리스트를 제외한 텍스트 내용만 미리보기
+    const { text: textContent } = parseChecklist(card.content);
+    if (textContent) {
+      const preview = textContent.length > 80 ? textContent.slice(0, 80) + "..." : textContent;
       cardEl.createDiv({ text: preview, cls: "kanban-card-content" });
     }
 
@@ -409,6 +509,131 @@ export class KanbanView extends ItemView {
       new Notice(`${flushed}개의 카드가 아카이브에 보관되었습니다.`);
       await this.refresh();
     }).open();
+  }
+
+  // ── 마감 임박 뷰 ──────────────────────────────────────────────────────────
+
+  private async switchToUpcoming() {
+    this.viewMode = "upcoming";
+    this.cards = await this.fileManager.loadCards();
+    this.render();
+  }
+
+  private renderUpcoming() {
+    const { containerEl } = this;
+    containerEl.empty();
+    containerEl.addClass("kanban-container");
+
+    const header = containerEl.createDiv("kanban-header");
+    const titleRow = header.createDiv("kanban-header-title-row");
+
+    const backBtn = titleRow.createEl("button", {
+      text: "← 보드로 돌아가기",
+      cls: "kanban-back-btn",
+    });
+    backBtn.addEventListener("click", () => this.switchToBoard());
+
+    titleRow.createEl("h2", { text: "마감 임박", cls: "kanban-upcoming-title" });
+
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    const todayStr = todayDate.toISOString().split("T")[0];
+
+    const weekDate = new Date(todayDate);
+    weekDate.setDate(weekDate.getDate() + 7);
+    const weekStr = weekDate.toISOString().split("T")[0];
+
+    const monthDate = new Date(todayDate);
+    monthDate.setDate(monthDate.getDate() + 30);
+    const monthStr = monthDate.toISOString().split("T")[0];
+
+    const activeColumnIds = new Set(this.settings.columns.map((c) => c.id));
+    const cardsWithDue = this.cards.filter((c) => c.due && activeColumnIds.has(c.status));
+
+    const groups: Array<{ key: string; label: string; cards: KanbanCard[] }> = [
+      {
+        key: "overdue",
+        label: "기한 초과",
+        cards: cardsWithDue.filter((c) => c.due! < todayStr),
+      },
+      {
+        key: "today",
+        label: "오늘",
+        cards: cardsWithDue.filter((c) => c.due === todayStr),
+      },
+      {
+        key: "week",
+        label: "이번 주 (7일 이내)",
+        cards: cardsWithDue.filter((c) => c.due! > todayStr && c.due! <= weekStr),
+      },
+      {
+        key: "month",
+        label: "이번 달 (30일 이내)",
+        cards: cardsWithDue.filter((c) => c.due! > weekStr && c.due! <= monthStr),
+      },
+      {
+        key: "later",
+        label: "이후",
+        cards: cardsWithDue.filter((c) => c.due! > monthStr),
+      },
+    ];
+
+    const content = containerEl.createDiv("kanban-upcoming-content");
+    let hasAny = false;
+
+    for (const group of groups) {
+      if (group.cards.length === 0) continue;
+      hasAny = true;
+
+      const section = content.createDiv("kanban-upcoming-section");
+      section.createEl("h3", {
+        text: `${group.label} (${group.cards.length}개)`,
+        cls: `kanban-upcoming-section-title${group.key === "overdue" ? " overdue" : ""}`,
+      });
+
+      const sorted = [...group.cards].sort((a, b) =>
+        a.due! > b.due! ? 1 : a.due! < b.due! ? -1 : 0
+      );
+      for (const card of sorted) {
+        this.renderUpcomingCard(section, card);
+      }
+    }
+
+    if (!hasAny) {
+      content.createDiv({ text: "마감일이 설정된 카드가 없습니다.", cls: "kanban-empty" });
+    }
+  }
+
+  private renderUpcomingCard(parent: HTMLElement, card: KanbanCard) {
+    const colLabel =
+      this.settings.columns.find((c) => c.id === card.status)?.label ?? card.status;
+    const priorityIcon: Record<string, string> = {
+      low: "🔵", medium: "🟡", high: "🔴", asap: "🚨",
+    };
+
+    const cardEl = parent.createDiv("kanban-upcoming-card");
+
+    const topRow = cardEl.createDiv("kanban-archive-card-top");
+    topRow.createSpan({ text: colLabel, cls: `kanban-status-badge status-${card.status}` });
+    topRow.createSpan({ text: card.title, cls: "kanban-archive-card-title" });
+    if (card.priority) topRow.createSpan({ text: priorityIcon[card.priority] ?? "" });
+
+    const metaRow = cardEl.createDiv("kanban-archive-card-meta");
+    if (card.due) metaRow.createSpan({ text: `📅 ${card.due}`, cls: "kanban-tag" });
+    for (const tag of card.tags) {
+      metaRow.createSpan({ text: `#${tag}`, cls: "kanban-tag" });
+    }
+
+    const { items: checklistItems } = parseChecklist(card.content);
+    if (checklistItems.length > 0) {
+      const checked = checklistItems.filter((i) => i.checked).length;
+      metaRow.createSpan({
+        text: `☑ ${checked}/${checklistItems.length}`,
+        cls: `kanban-checklist-progress${checked === checklistItems.length ? " complete" : ""}`,
+      });
+    }
+
+    cardEl.addEventListener("click", () => this.openEditModal(card));
   }
 
   // ── 아카이브 뷰 ──────────────────────────────────────────────────────────
@@ -540,7 +765,7 @@ export class KanbanView extends ItemView {
   private renderArchiveCard(parent: HTMLElement, card: ArchivedCard) {
     const colLabel =
       this.settings.columns.find((c) => c.id === card.flushedFrom)?.label ?? card.flushedFrom;
-    const priorityIcon: Record<string, string> = { low: "🔵", medium: "🟡", high: "🔴" };
+    const priorityIcon: Record<string, string> = { low: "🔵", medium: "🟡", high: "🔴", asap: "🚨" };
     const flushedDate = new Date(card.flushedAt).toLocaleDateString("ko-KR");
 
     const cardEl = parent.createDiv("kanban-archive-card");
@@ -548,17 +773,18 @@ export class KanbanView extends ItemView {
     const topRow = cardEl.createDiv("kanban-archive-card-top");
     topRow.createSpan({ text: colLabel, cls: `kanban-status-badge status-${card.flushedFrom}` });
     topRow.createSpan({ text: card.title, cls: "kanban-archive-card-title" });
-    if (card.priority) topRow.createSpan({ text: priorityIcon[card.priority] });
+    if (card.priority) topRow.createSpan({ text: priorityIcon[card.priority] ?? "" });
 
     const metaRow = cardEl.createDiv("kanban-archive-card-meta");
     if (card.due) metaRow.createSpan({ text: `📅 ${card.due}`, cls: "kanban-tag" });
-    metaRow.createSpan({ text: `🗃 ${flushedDate} flush`, cls: "kanban-archive-flush-date" });
+    metaRow.createSpan({ text: `🗃 ${flushedDate} 보관`, cls: "kanban-archive-flush-date" });
     for (const tag of card.tags) {
       metaRow.createSpan({ text: `#${tag}`, cls: "kanban-tag" });
     }
 
-    if (card.content) {
-      const preview = card.content.length > 100 ? card.content.slice(0, 100) + "..." : card.content;
+    const { text: textContent } = parseChecklist(card.content);
+    if (textContent) {
+      const preview = textContent.length > 100 ? textContent.slice(0, 100) + "..." : textContent;
       cardEl.createDiv({ text: preview, cls: "kanban-card-content" });
     }
 

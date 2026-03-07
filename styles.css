@@ -639,3 +639,256 @@
   font-size: 0.72em;
   opacity: 0.5;
 }
+
+/* ===== 검색 + 정렬 컨트롤 ===== */
+
+.kanban-header-btns {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.kanban-upcoming-open-btn {
+  padding: 3px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-base-30);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.8em;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.kanban-upcoming-open-btn:hover {
+  background: var(--interactive-accent);
+  color: white;
+  border-color: var(--interactive-accent);
+}
+
+.kanban-controls-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.kanban-search-input {
+  flex: 1;
+  min-width: 160px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.85em;
+  box-sizing: border-box;
+}
+
+.kanban-search-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+.kanban-sort-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.kanban-sort-btn {
+  padding: 3px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-base-30);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.78em;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+
+.kanban-sort-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.kanban-sort-btn.active {
+  background: var(--interactive-accent);
+  color: white;
+  border-color: var(--interactive-accent);
+}
+
+/* ===== 체크리스트 ===== */
+
+.kanban-card-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+
+.kanban-card-title-row .kanban-card-title {
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.kanban-checklist-progress {
+  font-size: 0.72em;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.kanban-checklist-progress.complete {
+  background: rgba(46, 204, 113, 0.18);
+  color: #2ecc71;
+  font-weight: 700;
+}
+
+/* 모달 내 체크리스트 */
+.kanban-checklist-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.kanban-checklist-header {
+  font-size: 0.82em;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.kanban-checklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.kanban-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kanban-checklist-checkbox {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+
+.kanban-checklist-item-input {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.88em;
+}
+
+.kanban-checklist-item-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+.kanban-checklist-del-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 0.1s ease, background 0.1s ease;
+}
+
+.kanban-checklist-del-btn:hover {
+  opacity: 1;
+  background: rgba(231, 76, 60, 0.1);
+  color: #e74c3c;
+}
+
+.kanban-checklist-add-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px dashed var(--background-modifier-border);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.82em;
+  color: var(--text-muted);
+  width: 100%;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.kanban-checklist-add-btn:hover {
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+  background: rgba(100, 120, 200, 0.04);
+}
+
+/* ===== 마감 임박 뷰 ===== */
+
+.kanban-upcoming-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-top: 14px;
+}
+
+.kanban-upcoming-title {
+  font-size: 1.2em;
+  margin: 0;
+}
+
+.kanban-upcoming-section {
+  margin-bottom: 24px;
+}
+
+.kanban-upcoming-section-title {
+  font-size: 0.85em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin: 0 0 10px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.kanban-upcoming-section-title.overdue {
+  color: #e74c3c;
+  opacity: 1;
+}
+
+.kanban-upcoming-card {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 7px;
+  padding: 10px 14px;
+  margin-bottom: 7px;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, background 0.1s ease;
+}
+
+.kanban-upcoming-card:hover {
+  background: var(--background-modifier-hover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
