@@ -697,7 +697,13 @@ export class KanbanView extends ItemView {
       type: "text",
       cls: "kanban-quick-add-input",
     });
-    quickInput.placeholder = "+ 카드 추가... (#태그 !높음 ^2026-03-15 / ^3/15 / ^오늘)";
+    quickInput.placeholder = "+ 카드 추가...";
+
+    const hint = quickAddEl.createDiv("kanban-quick-add-hint");
+    hint.innerHTML =
+      `<span>#태그</span> 태그 &nbsp;·&nbsp; ` +
+      `<span>!낮음 !중간 !높음 !ASAP</span> 우선순위<br>` +
+      `<span>^2026-03-15</span> · <span>^3/15</span> · <span>^오늘</span> · <span>^내일</span> &nbsp;마감일`;
     quickInput.addEventListener("keydown", async (e) => {
       if (e.key === "Enter") {
         const raw = quickInput.value.trim();

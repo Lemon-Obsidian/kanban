@@ -1084,6 +1084,19 @@
   box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 100, 120, 200), 0.1);
 }
 
+.kanban-quick-add-hint {
+  margin-top: 5px;
+  font-size: 0.74em;
+  color: var(--text-faint);
+  line-height: 1.6;
+  padding: 0 2px;
+}
+
+.kanban-quick-add-hint span {
+  font-family: var(--font-monospace);
+  color: var(--text-muted);
+}
+
 /* ── + 컬럼 추가 ─────────────────────────────────────────── */
 
 .kanban-add-column-placeholder {
