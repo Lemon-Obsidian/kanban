@@ -709,7 +709,7 @@ export class KanbanView extends ItemView {
     const titleEl = cardEl.createDiv("kanban-card-title");
     titleEl.createSpan({ text: card.title });
     if (card.priority && card.priority !== "medium") {
-      const priorityLabel: Record<string, string> = { low: "낮음", high: "높음", asap: "ASAP" };
+      const priorityLabel: Record<string, string> = { low: "우선순위 낮음", high: "우선순위 높음", asap: "우선순위 ASAP" };
       titleEl.createSpan({
         text: priorityLabel[card.priority],
         cls: `kanban-card-priority-chip priority-chip-${card.priority}`,
