@@ -108,6 +108,9 @@ export class KanbanView extends ItemView {
   private sortBy: SortBy = "created";
   private sortDir: "asc" | "desc" = "desc";
 
+  // 헤더를 유지한 채 컬럼만 재렌더링하기 위한 참조
+  private boardColumnsEl: HTMLElement | null = null;
+
   // Archive state
   private viewMode: ViewMode = "board";
   private archivedCards: ArchivedCard[] = [];
@@ -151,6 +154,7 @@ export class KanbanView extends ItemView {
   private renderBoard() {
     const { containerEl } = this;
     containerEl.empty();
+    this.boardColumnsEl = null;
     containerEl.addClass("kanban-container");
 
     const header = containerEl.createDiv("kanban-header");
@@ -173,7 +177,7 @@ export class KanbanView extends ItemView {
     });
     archiveBtn.addEventListener("click", () => this.switchToArchive());
 
-    // 검색 + 정렬 컨트롤
+    // 검색 + 정렬 컨트롤 (헤더는 한 번만 렌더링)
     const controlsRow = header.createDiv("kanban-controls-row");
 
     const searchInput = controlsRow.createEl("input", {
@@ -182,9 +186,10 @@ export class KanbanView extends ItemView {
     });
     searchInput.placeholder = "카드 검색 (제목, 내용, 태그)...";
     searchInput.value = this.boardSearch;
+    // 검색 변경 시 컬럼 영역만 갱신 — 헤더(=searchInput)는 유지
     searchInput.addEventListener("input", (e) => {
       this.boardSearch = (e.target as HTMLInputElement).value;
-      this.render();
+      this.renderBoardColumns();
     });
 
     const sortGroup = controlsRow.createDiv("kanban-sort-group");
@@ -196,6 +201,17 @@ export class KanbanView extends ItemView {
       { value: "priority", label: "우선순위" },
       { value: "title",    label: "제목" },
     ];
+
+    // 정렬 버튼 상태를 in-place 업데이트
+    const updateSortButtons = () => {
+      sortGroup.querySelectorAll<HTMLElement>(".kanban-sort-btn").forEach((btn, i) => {
+        const opt = sortOptions[i];
+        const isActive = this.sortBy === opt.value;
+        const dirIcon = isActive ? (this.sortDir === "desc" ? " ↓" : " ↑") : "";
+        btn.textContent = opt.label + dirIcon;
+        btn.classList.toggle("active", isActive);
+      });
+    };
 
     for (const opt of sortOptions) {
       const isActive = this.sortBy === opt.value;
@@ -211,19 +227,28 @@ export class KanbanView extends ItemView {
           this.sortBy = opt.value;
           this.sortDir = opt.value === "created" ? "desc" : "asc";
         }
-        this.render();
+        updateSortButtons();
+        this.renderBoardColumns();
       });
     }
 
     this.renderTagFilterBar(header);
 
-    const board = containerEl.createDiv("kanban-board");
+    // 컬럼 영역 (검색/정렬/태그 필터 변경 시 이 부분만 재렌더링)
+    this.boardColumnsEl = containerEl.createDiv("kanban-board");
+    this.renderBoardColumns();
+  }
+
+  /** 헤더를 건드리지 않고 컬럼 영역만 재렌더링 */
+  private renderBoardColumns() {
+    if (!this.boardColumnsEl) return;
+    this.boardColumnsEl.empty();
+
     for (const col of this.settings.columns) {
-      this.renderColumn(board, col.id, col.label, col.flushable ?? false);
+      this.renderColumn(this.boardColumnsEl, col.id, col.label, col.flushable ?? false);
     }
 
-    // + 컬럼 추가 버튼
-    const addColPlaceholder = board.createDiv("kanban-add-column-placeholder");
+    const addColPlaceholder = this.boardColumnsEl.createDiv("kanban-add-column-placeholder");
     addColPlaceholder.createDiv({ text: "+ 컬럼 추가", cls: "kanban-add-column-label" });
     addColPlaceholder.addEventListener("click", () => {
       new AddColumnModal(
@@ -252,7 +277,10 @@ export class KanbanView extends ItemView {
       text: "전체",
       cls: `kanban-tag-btn ${this.activeTagFilter === null ? "active" : ""}`,
     });
-    allBtn.addEventListener("click", () => { this.activeTagFilter = null; this.render(); });
+    allBtn.addEventListener("click", () => {
+      this.activeTagFilter = null;
+      this.render(); // 태그 필터는 클릭이므로 전체 재렌더링 OK
+    });
 
     for (const tag of [...allTags].sort()) {
       const btn = bar.createEl("button", {
@@ -297,7 +325,6 @@ export class KanbanView extends ItemView {
     });
     addBtn.addEventListener("click", () => this.openAddModal(columnId));
 
-    // 컬럼 옵션 메뉴 (···)
     const menuBtn = colHeader.createEl("button", {
       text: "···",
       cls: "kanban-col-menu-btn",
@@ -405,7 +432,6 @@ export class KanbanView extends ItemView {
     const titleRow = cardEl.createDiv("kanban-card-title-row");
     titleRow.createDiv({ text: card.title, cls: "kanban-card-title" });
 
-    // 체크리스트 진행률 배지
     const { items: checklistItems } = parseChecklist(card.content);
     if (checklistItems.length > 0) {
       const checked = checklistItems.filter((i) => i.checked).length;
@@ -424,7 +450,6 @@ export class KanbanView extends ItemView {
       });
     }
 
-    // 체크리스트를 제외한 텍스트 내용만 미리보기
     const { text: textContent } = parseChecklist(card.content);
     if (textContent) {
       const preview = textContent.length > 80 ? textContent.slice(0, 80) + "..." : textContent;
@@ -522,6 +547,7 @@ export class KanbanView extends ItemView {
   private renderUpcoming() {
     const { containerEl } = this;
     containerEl.empty();
+    this.boardColumnsEl = null;
     containerEl.addClass("kanban-container");
 
     const header = containerEl.createDiv("kanban-header");
@@ -551,31 +577,11 @@ export class KanbanView extends ItemView {
     const cardsWithDue = this.cards.filter((c) => c.due && activeColumnIds.has(c.status));
 
     const groups: Array<{ key: string; label: string; cards: KanbanCard[] }> = [
-      {
-        key: "overdue",
-        label: "기한 초과",
-        cards: cardsWithDue.filter((c) => c.due! < todayStr),
-      },
-      {
-        key: "today",
-        label: "오늘",
-        cards: cardsWithDue.filter((c) => c.due === todayStr),
-      },
-      {
-        key: "week",
-        label: "이번 주 (7일 이내)",
-        cards: cardsWithDue.filter((c) => c.due! > todayStr && c.due! <= weekStr),
-      },
-      {
-        key: "month",
-        label: "이번 달 (30일 이내)",
-        cards: cardsWithDue.filter((c) => c.due! > weekStr && c.due! <= monthStr),
-      },
-      {
-        key: "later",
-        label: "이후",
-        cards: cardsWithDue.filter((c) => c.due! > monthStr),
-      },
+      { key: "overdue", label: "기한 초과", cards: cardsWithDue.filter((c) => c.due! < todayStr) },
+      { key: "today",   label: "오늘",      cards: cardsWithDue.filter((c) => c.due === todayStr) },
+      { key: "week",    label: "이번 주 (7일 이내)",  cards: cardsWithDue.filter((c) => c.due! > todayStr && c.due! <= weekStr) },
+      { key: "month",   label: "이번 달 (30일 이내)", cards: cardsWithDue.filter((c) => c.due! > weekStr && c.due! <= monthStr) },
+      { key: "later",   label: "이후",      cards: cardsWithDue.filter((c) => c.due! > monthStr) },
     ];
 
     const content = containerEl.createDiv("kanban-upcoming-content");
@@ -650,15 +656,16 @@ export class KanbanView extends ItemView {
 
   private switchToBoard() {
     this.viewMode = "board";
+    this.boardColumnsEl = null;
     this.render();
   }
 
   private renderArchive() {
     const { containerEl } = this;
     containerEl.empty();
+    this.boardColumnsEl = null;
     containerEl.addClass("kanban-container");
 
-    // 헤더
     const header = containerEl.createDiv("kanban-header kanban-archive-header");
 
     const backBtn = header.createEl("button", {
@@ -669,7 +676,6 @@ export class KanbanView extends ItemView {
 
     header.createEl("h2", { text: "아카이브 히스토리", cls: "kanban-archive-title" });
 
-    // 검색창
     const searchWrap = header.createDiv("kanban-archive-search-wrap");
     const searchInput = searchWrap.createEl("input", {
       type: "text",
@@ -682,7 +688,6 @@ export class KanbanView extends ItemView {
       this.renderArchiveContent(content);
     });
 
-    // 필터 바
     const filterBar = header.createDiv("kanban-archive-filters");
     this.renderArchiveFilterRow(filterBar, "월", this.getArchiveMonths(), this.archiveMonthFilter, (v) => {
       this.archiveMonthFilter = v;
@@ -699,7 +704,6 @@ export class KanbanView extends ItemView {
       this.renderArchiveContent(content);
     }, (t) => `#${t}`);
 
-    // 카드 목록 영역
     const content = containerEl.createDiv("kanban-archive-content");
     this.renderArchiveContent(content);
   }
@@ -741,7 +745,6 @@ export class KanbanView extends ItemView {
       return;
     }
 
-    // 월별 그룹핑
     const groups = new Map<string, ArchivedCard[]>();
     for (const card of filtered) {
       const month = card.flushedAt.slice(0, 7);
@@ -755,7 +758,6 @@ export class KanbanView extends ItemView {
         text: `${this.formatMonth(month)} (${cards.length}개)`,
         cls: "kanban-archive-month-title",
       });
-
       for (const card of cards) {
         this.renderArchiveCard(section, card);
       }
