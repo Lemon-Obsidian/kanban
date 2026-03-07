@@ -705,12 +705,12 @@ export class KanbanView extends ItemView {
         }).open();
       });
 
-    // 제목 + 우선순위 chip
-    const titleRow = cardEl.createDiv("kanban-card-title-row");
-    titleRow.createDiv({ text: card.title, cls: "kanban-card-title" });
+    // 제목 + 우선순위 chip (chip은 제목 텍스트 바로 오른쪽 인라인)
+    const titleEl = cardEl.createDiv("kanban-card-title");
+    titleEl.createSpan({ text: card.title });
     if (card.priority && card.priority !== "medium") {
       const priorityLabel: Record<string, string> = { low: "낮음", high: "높음", asap: "ASAP" };
-      titleRow.createSpan({
+      titleEl.createSpan({
         text: priorityLabel[card.priority],
         cls: `kanban-card-priority-chip priority-chip-${card.priority}`,
       });

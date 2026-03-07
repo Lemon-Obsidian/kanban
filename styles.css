@@ -584,30 +584,26 @@
 }
 
 /* 카드 내용 */
-.kanban-card-title-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin-bottom: 6px;
-  padding-right: 52px;
-}
-
 .kanban-card-title {
   font-weight: 600;
   line-height: 1.45;
   font-size: 1em;
   word-break: break-word;
-  flex: 1;
+  margin-bottom: 6px;
+  padding-right: 52px;
 }
 
 .kanban-card-priority-chip {
-  flex-shrink: 0;
-  font-size: 0.68em;
+  display: inline-block;
+  vertical-align: middle;
+  font-size: 0.65em;
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 20px;
   letter-spacing: 0.03em;
-  margin-top: 2px;
+  margin-left: 6px;
+  position: relative;
+  top: -1px;
 }
 
 .priority-chip-low  { background: rgba(52, 152, 219, 0.15); color: #2980b9; }
