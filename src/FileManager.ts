@@ -176,6 +176,16 @@ export class FileManager {
     await this.app.vault.trash(file, true);
   }
 
+  async renameColumn(oldId: string, newId: string): Promise<void> {
+    if (oldId === newId) return;
+    const oldPath = this.getColumnPath(oldId);
+    const newPath = normalizePath(`${this.settings.boardFolder}/${newId}`);
+    const folder = this.app.vault.getAbstractFileByPath(oldPath);
+    if (folder instanceof TFolder) {
+      await this.app.vault.rename(folder, newPath);
+    }
+  }
+
   async deleteColumn(columnId: string): Promise<number> {
     const folder = this.app.vault.getAbstractFileByPath(this.getColumnPath(columnId));
     if (!(folder instanceof TFolder)) return 0;

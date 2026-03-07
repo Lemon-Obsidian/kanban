@@ -424,12 +424,19 @@ export class KanbanView extends ItemView {
         item.setTitle("컬럼명 수정").setIcon("pencil").onClick(() => {
           new RenameColumnModal(this.app, label, async (newLabel) => {
             const col = this.settings.columns.find((c) => c.id === columnId);
-            if (col) {
-              col.label = newLabel;
-              await this.saveSettings();
-              await this.refresh();
-              new Notice(`컬럼명이 "${newLabel}"으로 수정되었습니다.`);
+            if (!col) return;
+            const newId = slugify(newLabel) || columnId;
+            const idConflict = newId !== columnId && this.settings.columns.some((c) => c.id === newId);
+            if (idConflict) {
+              new Notice(`"${newId}" 폴더가 이미 존재합니다. 다른 이름을 사용하세요.`);
+              return;
             }
+            await this.fileManager.renameColumn(columnId, newId);
+            col.id = newId;
+            col.label = newLabel;
+            await this.saveSettings();
+            await this.refresh();
+            new Notice(`컬럼명이 "${newLabel}"으로 수정되었습니다.`);
           }).open();
         })
       );

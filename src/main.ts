@@ -153,13 +153,29 @@ class KanbanSettingTab extends PluginSettingTab {
         .setDesc(`폴더: ${col.id}`);
 
       // 이름
-      setting.addText((text) =>
-        text.setValue(col.label).onChange(async (v) => {
+      setting.addText((text) => {
+        text.setValue(col.label).onChange((v) => {
           cols[i].label = v.trim() || col.id;
+        });
+        text.inputEl.addEventListener("blur", async () => {
+          const newLabel = cols[i].label;
+          const newId = slugify(newLabel) || col.id;
+          if (newId !== col.id) {
+            const conflict = cols.some((c, j) => j !== i && c.id === newId);
+            if (conflict) {
+              new Notice(`"${newId}" 폴더가 이미 존재합니다.`);
+              cols[i].label = col.label; // 롤백
+              text.setValue(col.label);
+              return;
+            }
+            await this.plugin.fileManager.renameColumn(col.id, newId);
+            cols[i].id = newId;
+          }
           await this.plugin.saveSettings();
           this.plugin.refreshAllViews();
-        })
-      );
+          this.display();
+        });
+      });
 
       // 보관 가능 토글
       setting.addToggle((toggle) =>
