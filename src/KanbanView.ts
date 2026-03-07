@@ -288,6 +288,7 @@ export class KanbanView extends ItemView {
 
   async onOpen() {
     await this.refresh();
+    await this.checkRecurringCards();
     this.registerDomEvent(this.containerEl, "keydown", (e: KeyboardEvent) => this.handleKeydown(e));
   }
 
@@ -955,10 +956,38 @@ export class KanbanView extends ItemView {
 
   private openFlushModal(columnId: string, label: string, count: number) {
     new FlushConfirmModal(this.app, label, count, async () => {
+      // flush 전에 반복 카드의 다음 인스턴스를 먼저 생성
+      await this.spawnRecurNextForColumn(columnId);
       const flushed = await this.fileManager.flushColumn(columnId);
       new Notice(`${flushed}개의 카드가 아카이브에 보관되었습니다.`);
       await this.refresh();
     }).open();
+  }
+
+  // flush될 컬럼의 반복 카드 중 아직 다음 인스턴스가 없는 것만 생성
+  private async spawnRecurNextForColumn(columnId: string) {
+    const firstCol = this.activeBoard.columns.find((c) => !c.flushable);
+    if (!firstCol) return;
+
+    const activeRecurTitles = new Set(
+      this.cards.filter((c) => c.recur && !this.activeBoard.columns.find((col) => col.id === c.status)?.flushable)
+        .map((c) => c.title)
+    );
+
+    const toSpawn = this.cards.filter((c) => c.status === columnId && c.recur);
+    for (const card of toSpawn) {
+      if (activeRecurTitles.has(card.title)) continue;
+      await this.fileManager.createCard({
+        title: card.title,
+        tags: card.tags,
+        due: this.nextDueDate(card.due, card.recur!),
+        priority: card.priority,
+        recur: card.recur,
+        created: new Date().toISOString(),
+        content: card.content,
+        status: firstCol.id,
+      });
+    }
   }
 
   // ── 마감 임박 뷰 ──────────────────────────────────────────────────────────
@@ -1227,6 +1256,46 @@ export class KanbanView extends ItemView {
         this.openEditModal(card);
       }
     });
+  }
+
+  // ── 반복 카드 자동 생성 ───────────────────────────────────────────────────
+
+  // Kanban 뷰가 열릴 때 실행.
+  // flushable 컬럼(DONE 등)에 반복 카드가 있는데 활성 컬럼에 다음 인스턴스가 없으면 생성.
+  // (moveCard 트리거가 실행되지 않은 경우 — 파일 직접 이동, 플러그인 재시작 등)
+  private async checkRecurringCards() {
+    const flushableIds = new Set(
+      this.activeBoard.columns.filter((c) => c.flushable).map((c) => c.id)
+    );
+    const firstCol = this.activeBoard.columns.find((c) => !c.flushable);
+    if (!firstCol) return;
+
+    // 활성(non-flushable) 컬럼에 있는 반복 카드 제목 목록
+    const activeRecurTitles = new Set(
+      this.cards.filter((c) => c.recur && !flushableIds.has(c.status)).map((c) => c.title)
+    );
+
+    // flushable 컬럼에 있는 반복 카드 중 활성에 동일 제목이 없는 것만 생성
+    const toSpawn = this.cards.filter((c) => c.recur && flushableIds.has(c.status)
+      && !activeRecurTitles.has(c.title));
+
+    if (toSpawn.length === 0) return;
+
+    for (const card of toSpawn) {
+      await this.fileManager.createCard({
+        title: card.title,
+        tags: card.tags,
+        due: this.nextDueDate(card.due, card.recur!),
+        priority: card.priority,
+        recur: card.recur,
+        created: new Date().toISOString(),
+        content: card.content,
+        status: firstCol.id,
+      });
+    }
+
+    new Notice(`🔁 반복 카드 ${toSpawn.length}개가 TO-DO에 생성되었습니다.`);
+    await this.refresh();
   }
 
   // ── 키보드 단축키 ─────────────────────────────────────────────────────────

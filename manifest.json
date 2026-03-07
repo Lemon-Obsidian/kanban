@@ -1,7 +1,7 @@
 {
   "id": "lemon-kanban",
   "name": "@lemon/kanban",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "minAppVersion": "1.0.0",
   "description": "Kanban board with hashtag filtering and tag-group view for completed cards.",
   "author": "lemon",
