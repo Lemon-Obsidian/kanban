@@ -421,10 +421,11 @@ export class KanbanView extends ItemView {
     }
     if (this.boardSearch) {
       const q = this.boardSearch.toLowerCase();
+      const tagQ = q.startsWith("#") ? q.slice(1) : q;
       cards = cards.filter((c) =>
         c.title.toLowerCase().includes(q) ||
         c.content.toLowerCase().includes(q) ||
-        c.tags.some((t) => t.toLowerCase().includes(q))
+        c.tags.some((t) => t.toLowerCase().includes(tagQ))
       );
     }
     return this.sortCards(cards);
