@@ -290,7 +290,7 @@ export class KanbanView extends ItemView {
     await this.refresh();
     await this.checkRecurringTasks();
     this.registerDomEvent(document, "keydown", (e: KeyboardEvent) => {
-      if (this.app.workspace.activeLeaf?.view !== this) return;
+      if (this.app.workspace.activeLeaf !== this.leaf) return;
       this.handleKeydown(e);
     });
   }
