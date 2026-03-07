@@ -705,15 +705,23 @@ export class KanbanView extends ItemView {
         }).open();
       });
 
-    // 제목
-    cardEl.createDiv({ text: card.title, cls: "kanban-card-title" });
+    // 제목 + 우선순위 chip
+    const titleRow = cardEl.createDiv("kanban-card-title-row");
+    titleRow.createDiv({ text: card.title, cls: "kanban-card-title" });
+    if (card.priority && card.priority !== "medium") {
+      const priorityLabel: Record<string, string> = { low: "낮음", high: "높음", asap: "ASAP" };
+      titleRow.createSpan({
+        text: priorityLabel[card.priority],
+        cls: `kanban-card-priority-chip priority-chip-${card.priority}`,
+      });
+    }
 
     // 마감일
     if (card.due) {
       const today = new Date().toISOString().split("T")[0];
       const overdue = card.due < today;
       cardEl.createDiv({
-        text: `${overdue ? "⚠ 기한 초과 · " : "📅 "}${card.due}`,
+        text: `${overdue ? "⚠ 기한 초과 · " : "📅 "}${card.due}까지`,
         cls: `kanban-card-due${overdue ? " overdue" : ""}`,
       });
     }

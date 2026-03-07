@@ -70,10 +70,10 @@ export class CardModal extends Modal {
 
     // Priority — 세그먼트 토글
     const priorityOptions: { value: typeof this.priority; label: string }[] = [
-      { value: "low",    label: "낮음" },
-      { value: "medium", label: "중간" },
-      { value: "high",   label: "높음" },
-      { value: "asap",   label: "ASAP" },
+      { value: "low",    label: "🔵 낮음" },
+      { value: "medium", label: "🟡 중간" },
+      { value: "high",   label: "🔴 높음" },
+      { value: "asap",   label: "🚨 ASAP" },
     ];
 
     const prioritySetting = new Setting(contentEl).setName("우선순위");
