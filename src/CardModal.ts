@@ -13,6 +13,7 @@ export class CardModal extends Modal {
   private tags = "";
   private due = "";
   private priority: "low" | "medium" | "high" | "asap" = "medium";
+  private recur: "daily" | "weekly" | "monthly" | "" = "";
   private textContent = "";
   private checklistItems: ChecklistItem[] = [];
 
@@ -23,6 +24,7 @@ export class CardModal extends Modal {
       this.tags = formatTags(options.card.tags);
       this.due = options.card.due ?? "";
       this.priority = options.card.priority ?? "medium";
+      this.recur = options.card.recur ?? "";
       const { items, text } = parseChecklist(options.card.content);
       this.checklistItems = items;
       this.textContent = text;
@@ -166,6 +168,19 @@ export class CardModal extends Modal {
       });
     }
 
+    // Recur
+    new Setting(contentEl)
+      .setName("반복")
+      .setDesc("완료 컬럼으로 이동 시 TO-DO에 자동으로 새 카드 생성")
+      .addDropdown((dd) => {
+        dd.addOption("", "반복 없음");
+        dd.addOption("daily", "매일");
+        dd.addOption("weekly", "매주");
+        dd.addOption("monthly", "매월");
+        dd.setValue(this.recur);
+        dd.onChange((v) => (this.recur = v as typeof this.recur));
+      });
+
     // Content
     new Setting(contentEl).setName("내용").addTextArea((area) => {
       area
@@ -276,6 +291,7 @@ export class CardModal extends Modal {
       tags: parseTags(this.tags),
       due: this.due || undefined,
       priority: this.priority,
+      recur: this.recur || undefined,
       created: this.options.card?.created ?? new Date().toISOString(),
       content: fullContent,
       status: this.options.card?.status ?? "todo",

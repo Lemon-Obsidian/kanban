@@ -627,9 +627,9 @@ export class KanbanView extends ItemView {
       e.preventDefault();
       col.removeClass("drag-over");
       if (this.draggedCard && this.draggedCard.status !== columnId) {
-        await this.fileManager.moveCard(this.draggedCard, columnId);
+        const moved = this.draggedCard;
         this.draggedCard = null;
-        await this.refresh();
+        await this.moveCard(moved, columnId);
       }
     });
 
@@ -742,6 +742,12 @@ export class KanbanView extends ItemView {
         text: priorityLabel[card.priority],
         cls: `kanban-card-priority-chip priority-chip-${card.priority}`,
       });
+    }
+
+    // 반복 배지
+    if (card.recur) {
+      const recurLabel: Record<string, string> = { daily: "매일", weekly: "매주", monthly: "매월" };
+      cardEl.createDiv({ text: `🔁 ${recurLabel[card.recur]}`, cls: "kanban-card-recur" });
     }
 
     // 마감일
@@ -879,7 +885,38 @@ export class KanbanView extends ItemView {
 
   private async moveCard(card: KanbanCard, newColumnId: string) {
     await this.fileManager.moveCard(card, newColumnId);
+
+    // 반복 카드: flushable 컬럼으로 이동 시 첫 번째 non-flushable 컬럼에 새 카드 생성
+    if (card.recur) {
+      const targetCol = this.activeBoard.columns.find((c) => c.id === newColumnId);
+      if (targetCol?.flushable) {
+        const firstCol = this.activeBoard.columns.find((c) => !c.flushable);
+        if (firstCol) {
+          await this.fileManager.createCard({
+            title: card.title,
+            tags: card.tags,
+            due: this.nextDueDate(card.due, card.recur),
+            priority: card.priority,
+            recur: card.recur,
+            created: new Date().toISOString(),
+            content: card.content,
+            status: firstCol.id,
+          });
+          new Notice(`🔁 반복 카드가 "${firstCol.label}"에 생성되었습니다.`);
+        }
+      }
+    }
+
     await this.refresh();
+  }
+
+  private nextDueDate(due: string | undefined, recur: string): string | undefined {
+    if (!due) return undefined;
+    const d = new Date(due);
+    if (recur === "daily") d.setDate(d.getDate() + 1);
+    else if (recur === "weekly") d.setDate(d.getDate() + 7);
+    else if (recur === "monthly") d.setMonth(d.getMonth() + 1);
+    return d.toISOString().split("T")[0];
   }
 
   private openFlushModal(columnId: string, label: string, count: number) {

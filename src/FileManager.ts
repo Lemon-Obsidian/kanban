@@ -59,6 +59,7 @@ export class FileManager {
     };
     if (card.due) fm.due = card.due;
     if (card.priority) fm.priority = card.priority;
+    if (card.recur) fm.recur = card.recur;
 
     const yaml = stringifyYaml(fm).trim();
     const body = card.content ? `\n\n${card.content}` : "";
@@ -99,6 +100,10 @@ export class FileManager {
           : undefined,
       created:
         typeof fm.created === "string" ? fm.created : new Date().toISOString(),
+      recur:
+        fm.recur === "daily" || fm.recur === "weekly" || fm.recur === "monthly"
+          ? fm.recur
+          : undefined,
       content,
       filePath,
       status,

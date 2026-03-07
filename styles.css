@@ -784,6 +784,14 @@
   opacity: 0.85;
 }
 
+/* ── 반복 카드 배지 ──────────────────────────────────────── */
+
+.kanban-card-recur {
+  font-size: 0.72em;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
 /* ── 내부 링크 ───────────────────────────────────────────── */
 
 .kanban-internal-link {

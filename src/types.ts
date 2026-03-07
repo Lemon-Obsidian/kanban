@@ -5,6 +5,7 @@ export interface KanbanCard {
   priority?: "low" | "medium" | "high" | "asap";
   created: string;
   mtime?: number; // file modification time (ms)
+  recur?: "daily" | "weekly" | "monthly";
   content: string;
   filePath: string;
   status: string; // column id
