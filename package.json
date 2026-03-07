@@ -1,5 +1,5 @@
 {
-  "name": "obsidian-kanban-hashtag",
+  "name": "@lemon/kanban",
   "version": "1.0.0",
   "description": "Kanban board for Obsidian with hashtag support",
   "main": "main.js",

@@ -1,6 +1,6 @@
 {
-  "id": "obsidian-kanban-hashtag",
-  "name": "Kanban with Hashtags",
+  "id": "lemon-kanban",
+  "name": "@lemon/kanban",
   "version": "1.0.0",
   "minAppVersion": "1.0.0",
   "description": "Kanban board with hashtag filtering and tag-group view for completed cards.",
