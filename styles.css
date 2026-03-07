@@ -1598,3 +1598,35 @@
 .kanban-tag-card-priority {
   flex-shrink: 0;
 }
+
+/* ── 위키링크 자동완성 드롭다운 ──────────────────────────── */
+
+.kanban-wiki-suggest {
+  position: fixed;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-s);
+  z-index: 10000;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.kanban-wiki-suggest-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: var(--font-ui-small);
+}
+
+.kanban-wiki-suggest-item:hover,
+.kanban-wiki-suggest-item.is-selected {
+  background: var(--background-modifier-hover);
+}
+
+.kanban-wiki-suggest-path {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}

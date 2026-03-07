@@ -1,4 +1,4 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, Modal, Setting, TFile } from "obsidian";
 import { KanbanCard } from "./types";
 import { parseTags, formatTags, ChecklistItem, parseChecklist, formatChecklist } from "./utils";
 
@@ -182,6 +182,7 @@ export class CardModal extends Modal {
       });
 
     // Content
+    let contentAreaEl: HTMLTextAreaElement;
     new Setting(contentEl).setName("내용").addTextArea((area) => {
       area
         .setPlaceholder("카드 내용 (선택 사항)...")
@@ -189,7 +190,9 @@ export class CardModal extends Modal {
         .onChange((v) => (this.textContent = v));
       area.inputEl.rows = 4;
       area.inputEl.style.width = "100%";
+      contentAreaEl = area.inputEl;
     });
+    attachWikilinkSuggest(this.app, contentAreaEl!);
 
     // Checklist
     const checklistSection = contentEl.createDiv("kanban-checklist-section");
@@ -302,4 +305,106 @@ export class CardModal extends Modal {
   onClose() {
     this.contentEl.empty();
   }
+}
+
+function attachWikilinkSuggest(app: App, el: HTMLTextAreaElement | HTMLInputElement) {
+  let dropdownEl: HTMLDivElement | null = null;
+  let activeIndex = -1;
+  let currentFiles: TFile[] = [];
+
+  const hide = () => {
+    dropdownEl?.remove();
+    dropdownEl = null;
+    activeIndex = -1;
+    currentFiles = [];
+  };
+
+  const getQuery = (): { bracketStart: number; query: string } | null => {
+    const val = el.value;
+    const cursor = el.selectionStart ?? val.length;
+    const before = val.slice(0, cursor);
+    const bracketStart = before.lastIndexOf("[[");
+    if (bracketStart === -1) return null;
+    const query = before.slice(bracketStart + 2);
+    if (query.includes("]") || query.includes("[")) return null;
+    return { bracketStart, query };
+  };
+
+  const insertLink = (name: string) => {
+    const result = getQuery();
+    if (!result) return;
+    const { bracketStart } = result;
+    const val = el.value;
+    const cursor = el.selectionStart ?? val.length;
+    const after = val.slice(cursor);
+    el.value = val.slice(0, bracketStart) + `[[${name}]]` + after;
+    const newCursor = bracketStart + name.length + 4;
+    el.setSelectionRange(newCursor, newCursor);
+    el.dispatchEvent(new Event("input"));
+    hide();
+    el.focus();
+  };
+
+  const renderDropdown = (files: TFile[]) => {
+    hide();
+    if (files.length === 0) return;
+    currentFiles = files;
+    const rect = el.getBoundingClientRect();
+    dropdownEl = document.body.createDiv("kanban-wiki-suggest");
+    dropdownEl.style.left = `${rect.left}px`;
+    dropdownEl.style.top = `${rect.bottom + 2}px`;
+    dropdownEl.style.width = `${Math.max(rect.width, 220)}px`;
+
+    for (const file of files) {
+      const item = dropdownEl.createDiv({ cls: "kanban-wiki-suggest-item" });
+      item.createSpan({ text: file.basename });
+      if (file.parent && file.parent.path !== "/") {
+        item.createSpan({ text: file.parent.path, cls: "kanban-wiki-suggest-path" });
+      }
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        insertLink(file.basename);
+      });
+    }
+  };
+
+  el.addEventListener("input", () => {
+    const result = getQuery();
+    if (!result || result.query.length === 0) { hide(); return; }
+    const q = result.query.toLowerCase();
+    const files = app.vault.getMarkdownFiles()
+      .filter(f => f.basename.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const al = a.basename.toLowerCase(), bl = b.basename.toLowerCase();
+        if (al.startsWith(q) && !bl.startsWith(q)) return -1;
+        if (bl.startsWith(q) && !al.startsWith(q)) return 1;
+        return al.localeCompare(bl);
+      })
+      .slice(0, 8);
+    if (files.length > 0) renderDropdown(files);
+    else hide();
+  });
+
+  el.addEventListener("keydown", (e) => {
+    if (!dropdownEl) return;
+    const items = Array.from(dropdownEl.querySelectorAll<HTMLElement>(".kanban-wiki-suggest-item"));
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      activeIndex = (activeIndex + 1) % items.length;
+      items.forEach((item, i) => item.classList.toggle("is-selected", i === activeIndex));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      activeIndex = (activeIndex - 1 + items.length) % items.length;
+      items.forEach((item, i) => item.classList.toggle("is-selected", i === activeIndex));
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      insertLink(currentFiles[activeIndex].basename);
+    } else if (e.key === "Escape") {
+      hide();
+      e.stopPropagation();
+    }
+  });
+
+  el.addEventListener("blur", () => setTimeout(hide, 150));
 }
