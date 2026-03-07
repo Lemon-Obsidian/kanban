@@ -9,9 +9,15 @@ export interface KanbanCard {
   status: string; // column id
 }
 
+export interface ArchivedCard extends KanbanCard {
+  flushedAt: string;  // ISO timestamp
+  flushedFrom: string; // original column id
+}
+
 export interface KanbanColumn {
-  id: string;    // subfolder name
-  label: string; // display name
+  id: string;        // subfolder name
+  label: string;     // display name
+  flushable?: boolean;
 }
 
 export interface KanbanSettings {
@@ -22,8 +28,8 @@ export interface KanbanSettings {
 export const DEFAULT_SETTINGS: KanbanSettings = {
   boardFolder: "Kanban",
   columns: [
-    { id: "todo", label: "TO-DO" },
-    { id: "doing", label: "IN PROGRESS" },
-    { id: "done", label: "DONE" },
+    { id: "todo",  label: "TO-DO",       flushable: false },
+    { id: "doing", label: "IN PROGRESS", flushable: false },
+    { id: "done",  label: "DONE",        flushable: true  },
   ],
 };

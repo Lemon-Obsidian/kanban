@@ -6,7 +6,7 @@ import {
   parseYaml,
   stringifyYaml,
 } from "obsidian";
-import { KanbanCard, KanbanSettings } from "./types";
+import { ArchivedCard, KanbanCard, KanbanSettings } from "./types";
 import { slugify } from "./utils";
 
 export class FileManager {
@@ -14,6 +14,15 @@ export class FileManager {
 
   private getColumnPath(columnId: string): string {
     return normalizePath(`${this.settings.boardFolder}/${columnId}`);
+  }
+
+  private getArchiveBasePath(): string {
+    return normalizePath(`${this.settings.boardFolder}/_archive`);
+  }
+
+  private getArchiveMonthPath(date: Date): string {
+    const month = date.toISOString().slice(0, 7); // "YYYY-MM"
+    return normalizePath(`${this.getArchiveBasePath()}/${month}`);
   }
 
   async ensureFolders(): Promise<void> {
@@ -25,6 +34,16 @@ export class FileManager {
       const normalized = normalizePath(p);
       if (!this.app.vault.getAbstractFileByPath(normalized)) {
         await this.app.vault.createFolder(normalized);
+      }
+    }
+  }
+
+  private async ensureArchiveMonthFolder(date: Date): Promise<void> {
+    const base = this.getArchiveBasePath();
+    const month = this.getArchiveMonthPath(date);
+    for (const p of [base, month]) {
+      if (!this.app.vault.getAbstractFileByPath(p)) {
+        await this.app.vault.createFolder(p);
       }
     }
   }
@@ -71,9 +90,7 @@ export class FileManager {
       tags: Array.isArray(fm.tags) ? (fm.tags as string[]) : [],
       due: typeof fm.due === "string" ? fm.due : undefined,
       priority:
-        fm.priority === "low" ||
-        fm.priority === "medium" ||
-        fm.priority === "high"
+        fm.priority === "low" || fm.priority === "medium" || fm.priority === "high"
           ? fm.priority
           : undefined,
       created:
@@ -104,8 +121,7 @@ export class FileManager {
     }
 
     return cards.sort(
-      (a, b) =>
-        new Date(b.created).getTime() - new Date(a.created).getTime()
+      (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
     );
   }
 
@@ -158,5 +174,112 @@ export class FileManager {
     const file = this.app.vault.getAbstractFileByPath(card.filePath);
     if (!(file instanceof TFile)) return;
     await this.app.vault.trash(file, true);
+  }
+
+  // ── Flush ────────────────────────────────────────────────────────────────
+
+  async flushColumn(columnId: string): Promise<number> {
+    const cards = await this.loadCards(columnId);
+    if (cards.length === 0) return 0;
+
+    const now = new Date();
+    await this.ensureArchiveMonthFolder(now);
+    const monthPath = this.getArchiveMonthPath(now);
+
+    for (const card of cards) {
+      const file = this.app.vault.getAbstractFileByPath(card.filePath);
+      if (!(file instanceof TFile)) continue;
+
+      // frontmatter에 flush 메타데이터 추가
+      const raw = await this.app.vault.read(file);
+      const updated = this.injectFlushMeta(raw, now, columnId);
+      await this.app.vault.modify(file, updated);
+
+      // _archive/YYYY-MM/ 로 이동
+      const filename = file.name;
+      let newPath = normalizePath(`${monthPath}/${filename}`);
+      let counter = 1;
+      while (this.app.vault.getAbstractFileByPath(newPath)) {
+        const base = filename.replace(".md", "");
+        newPath = normalizePath(`${monthPath}/${base}-${counter++}.md`);
+      }
+
+      await this.app.vault.rename(file, newPath);
+    }
+
+    return cards.length;
+  }
+
+  private injectFlushMeta(raw: string, flushedAt: Date, flushedFrom: string): string {
+    const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    let fm: Record<string, unknown> = {};
+    let rest = raw;
+
+    if (fmMatch) {
+      try { fm = (parseYaml(fmMatch[1]) as Record<string, unknown>) || {}; } catch { /**/ }
+      rest = fmMatch[2];
+    }
+
+    fm.flushedAt = flushedAt.toISOString();
+    fm.flushedFrom = flushedFrom;
+
+    return `---\n${stringifyYaml(fm).trim()}\n---\n${rest}`;
+  }
+
+  // ── Archive ──────────────────────────────────────────────────────────────
+
+  async loadArchivedCards(): Promise<ArchivedCard[]> {
+    const archiveFolder = this.app.vault.getAbstractFileByPath(
+      this.getArchiveBasePath()
+    );
+    if (!(archiveFolder instanceof TFolder)) return [];
+
+    const cards: ArchivedCard[] = [];
+
+    for (const monthFolder of archiveFolder.children) {
+      if (!(monthFolder instanceof TFolder)) continue;
+
+      for (const child of monthFolder.children) {
+        if (!(child instanceof TFile) || child.extension !== "md") continue;
+        const raw = await this.app.vault.read(child);
+        const card = this.parseArchivedCard(child.path, raw);
+        if (card) cards.push(card);
+      }
+    }
+
+    return cards.sort(
+      (a, b) => new Date(b.flushedAt).getTime() - new Date(a.flushedAt).getTime()
+    );
+  }
+
+  private parseArchivedCard(filePath: string, raw: string): ArchivedCard | null {
+    const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n/);
+    if (!fmMatch) return null;
+
+    let fm: Record<string, unknown> = {};
+    try { fm = (parseYaml(fmMatch[1]) as Record<string, unknown>) || {}; } catch { return null; }
+
+    if (typeof fm.flushedAt !== "string" || typeof fm.flushedFrom !== "string") return null;
+
+    const base = this.parseFileContent(filePath, raw, fm.flushedFrom as string);
+    return { ...base, flushedAt: fm.flushedAt, flushedFrom: fm.flushedFrom as string };
+  }
+
+  async updateArchivedCard(card: ArchivedCard): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(card.filePath);
+    if (!(file instanceof TFile)) return;
+
+    const fm: Record<string, unknown> = {
+      tags: card.tags,
+      created: card.created,
+      flushedAt: card.flushedAt,
+      flushedFrom: card.flushedFrom,
+    };
+    if (card.due) fm.due = card.due;
+    if (card.priority) fm.priority = card.priority;
+
+    const yaml = stringifyYaml(fm).trim();
+    const body = card.content ? `\n\n${card.content}` : "";
+    await this.app.vault.modify(file, `---\n${yaml}\n---\n\n# ${card.title}${body}`);
   }
 }

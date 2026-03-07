@@ -89,7 +89,6 @@ export default class KanbanPlugin extends Plugin {
     this.settings = {
       ...DEFAULT_SETTINGS,
       ...saved,
-      // columns가 저장되지 않은 경우 기본값 사용
       columns: saved?.columns ?? DEFAULT_SETTINGS.columns,
     };
   }
@@ -106,6 +105,7 @@ export default class KanbanPlugin extends Plugin {
 
 class KanbanSettingTab extends PluginSettingTab {
   private newColName = "";
+  private newColFlushable = false;
 
   constructor(app: App, private plugin: KanbanPlugin) {
     super(app, plugin);
@@ -137,7 +137,7 @@ class KanbanSettingTab extends PluginSettingTab {
     // ── 컬럼 관리 ──
     containerEl.createEl("h3", { text: "컬럼 관리" });
     containerEl.createEl("p", {
-      text: "컬럼 순서대로 보드에 표시됩니다. 컬럼 폴더명은 생성 시 자동으로 결정됩니다.",
+      text: "컬럼 순서대로 보드에 표시됩니다. Flush 가능 컬럼은 보드에서 일괄 아카이브할 수 있습니다.",
       cls: "setting-item-description",
     });
 
@@ -149,11 +149,22 @@ class KanbanSettingTab extends PluginSettingTab {
         .setName(`컬럼 ${i + 1}`)
         .setDesc(`폴더: ${col.id}`);
 
+      // 이름
       setting.addText((text) =>
-        text
-          .setValue(col.label)
+        text.setValue(col.label).onChange(async (v) => {
+          cols[i].label = v.trim() || col.id;
+          await this.plugin.saveSettings();
+          this.plugin.refreshAllViews();
+        })
+      );
+
+      // Flush 가능 토글
+      setting.addToggle((toggle) =>
+        toggle
+          .setTooltip("Flush 가능")
+          .setValue(col.flushable ?? false)
           .onChange(async (v) => {
-            cols[i].label = v.trim() || col.id;
+            cols[i].flushable = v;
             await this.plugin.saveSettings();
             this.plugin.refreshAllViews();
           })
@@ -214,6 +225,7 @@ class KanbanSettingTab extends PluginSettingTab {
 
     // ── 새 컬럼 추가 ──
     containerEl.createEl("h4", { text: "새 컬럼 추가" });
+
     new Setting(containerEl)
       .setName("컬럼 이름")
       .addText((text) => {
@@ -226,10 +238,16 @@ class KanbanSettingTab extends PluginSettingTab {
         });
       })
       .addButton((btn) =>
-        btn
-          .setButtonText("추가")
-          .setCta()
-          .onClick(() => this.addColumn())
+        btn.setButtonText("추가").setCta().onClick(() => this.addColumn())
+      );
+
+    new Setting(containerEl)
+      .setName("Flush 가능")
+      .setDesc("이 컬럼의 카드를 일괄 아카이브(Flush)할 수 있습니다")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.newColFlushable)
+          .onChange((v) => (this.newColFlushable = v))
       );
   }
 
@@ -243,20 +261,20 @@ class KanbanSettingTab extends PluginSettingTab {
     const existingIds = this.plugin.settings.columns.map((c) => c.id);
     let id = slugify(name) || `col-${Date.now()}`;
 
-    // 중복 ID 방지
     if (existingIds.includes(id)) {
       let n = 2;
       while (existingIds.includes(`${id}-${n}`)) n++;
       id = `${id}-${n}`;
     }
 
-    const newCol: KanbanColumn = { id, label: name };
+    const newCol: KanbanColumn = { id, label: name, flushable: this.newColFlushable };
     this.plugin.settings.columns.push(newCol);
     await this.plugin.saveSettings();
     await this.plugin.fileManager.ensureFolders();
     this.plugin.refreshAllViews();
 
     this.newColName = "";
+    this.newColFlushable = false;
     this.display();
     new Notice(`"${name}" 컬럼이 추가되었습니다.`);
   }
