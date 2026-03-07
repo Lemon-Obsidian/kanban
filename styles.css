@@ -232,6 +232,35 @@
   box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb, 100, 120, 200), 0.15);
 }
 
+.kanban-column.col-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.kanban-column.col-drag-over {
+  border-color: var(--color-accent);
+  box-shadow: -3px 0 0 var(--color-accent);
+}
+
+.kanban-col-drag-handle {
+  font-size: 0.9em;
+  color: var(--text-faint);
+  cursor: grab;
+  padding: 0 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.kanban-column-header:hover .kanban-col-drag-handle {
+  opacity: 1;
+}
+
+.kanban-col-drag-handle:active {
+  cursor: grabbing;
+}
+
 .kanban-column-header {
   display: flex;
   align-items: center;

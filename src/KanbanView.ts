@@ -178,6 +178,7 @@ export class KanbanView extends ItemView {
   private sortDir: "asc" | "desc" = "desc";
   private boardColumnsEl: HTMLElement | null = null;
 
+  private draggedColumnId: string | null = null;
   private viewMode: ViewMode = "board";
   private archivedCards: ArchivedCard[] = [];
   private archiveSearch = "";
@@ -352,9 +353,48 @@ export class KanbanView extends ItemView {
     const col = parent.createDiv("kanban-column");
     col.dataset.status = columnId;
 
+    // 컬럼 드래그 앤 드랍
+    col.addEventListener("dragstart", (e) => {
+      if (!col.draggable) return;
+      this.draggedColumnId = columnId;
+      e.dataTransfer?.setData("text/plain", columnId);
+      setTimeout(() => col.addClass("col-dragging"), 0);
+    });
+    col.addEventListener("dragend", () => {
+      col.draggable = false;
+      col.removeClass("col-dragging");
+      this.draggedColumnId = null;
+      parent.querySelectorAll<HTMLElement>(".kanban-column").forEach((el) => el.removeClass("col-drag-over"));
+    });
+    col.addEventListener("dragover", (e) => {
+      if (!this.draggedColumnId || this.draggedColumnId === columnId) return;
+      e.preventDefault();
+      col.addClass("col-drag-over");
+    });
+    col.addEventListener("dragleave", (e) => {
+      if (!col.contains(e.relatedTarget as Node)) col.removeClass("col-drag-over");
+    });
+    col.addEventListener("drop", async (e) => {
+      if (!this.draggedColumnId || this.draggedColumnId === columnId) return;
+      e.preventDefault();
+      col.removeClass("col-drag-over");
+      const fromId = this.draggedColumnId;
+      const fromIdx = this.settings.columns.findIndex((c) => c.id === fromId);
+      const toIdx = this.settings.columns.findIndex((c) => c.id === columnId);
+      if (fromIdx !== -1 && toIdx !== -1) {
+        const [removed] = this.settings.columns.splice(fromIdx, 1);
+        this.settings.columns.splice(toIdx, 0, removed);
+        await this.saveSettings();
+        await this.refresh();
+      }
+    });
+
     // 헤더
     const colHeader = col.createDiv("kanban-column-header");
     const colHeaderLeft = colHeader.createDiv("kanban-column-header-left");
+    const dragHandle = colHeaderLeft.createSpan({ text: "⠿", cls: "kanban-col-drag-handle", title: "드래그하여 순서 변경" });
+    dragHandle.addEventListener("mousedown", () => { col.draggable = true; });
+    dragHandle.addEventListener("mouseup", () => { if (!this.draggedColumnId) col.draggable = false; });
     colHeaderLeft.createEl("h2", { text: label, cls: "kanban-column-title" });
     colHeaderLeft.createDiv({ text: String(allCards.length), cls: "kanban-column-count" });
 
@@ -425,11 +465,16 @@ export class KanbanView extends ItemView {
     // 카드 목록
     const cardsEl = col.createDiv("kanban-cards");
 
-    cardsEl.addEventListener("dragover", (e) => { e.preventDefault(); col.addClass("drag-over"); });
+    cardsEl.addEventListener("dragover", (e) => {
+      if (this.draggedColumnId) return;
+      e.preventDefault();
+      col.addClass("drag-over");
+    });
     cardsEl.addEventListener("dragleave", (e) => {
       if (!col.contains(e.relatedTarget as Node)) col.removeClass("drag-over");
     });
     cardsEl.addEventListener("drop", async (e) => {
+      if (this.draggedColumnId) return;
       e.preventDefault();
       col.removeClass("drag-over");
       if (this.draggedCard && this.draggedCard.status !== columnId) {
