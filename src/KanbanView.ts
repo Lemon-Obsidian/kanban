@@ -1,5 +1,5 @@
 import { ItemView, Menu, Notice, WorkspaceLeaf } from "obsidian";
-import { COLUMN_CONFIG, ColumnStatus, KanbanCard, KanbanSettings } from "./types";
+import { KanbanCard, KanbanSettings } from "./types";
 import { FileManager } from "./FileManager";
 import { CardModal } from "./CardModal";
 
@@ -13,7 +13,7 @@ export class KanbanView extends ItemView {
   constructor(
     leaf: WorkspaceLeaf,
     private fileManager: FileManager,
-    _settings: KanbanSettings
+    private settings: KanbanSettings
   ) {
     super(leaf);
   }
@@ -25,7 +25,7 @@ export class KanbanView extends ItemView {
     return "Kanban Board";
   }
   getIcon() {
-    return "layout-kanban";
+    return "columns";
   }
 
   async onOpen() {
@@ -42,14 +42,12 @@ export class KanbanView extends ItemView {
     containerEl.empty();
     containerEl.addClass("kanban-container");
 
-    // Header
     const header = containerEl.createDiv("kanban-header");
     header.createEl("h1", { text: "Kanban Board", cls: "kanban-title" });
     this.renderTagFilterBar(header);
 
-    // Board columns
     const board = containerEl.createDiv("kanban-board");
-    for (const col of COLUMN_CONFIG) {
+    for (const col of this.settings.columns) {
       this.renderColumn(board, col.id, col.label);
     }
   }
@@ -83,17 +81,12 @@ export class KanbanView extends ItemView {
     }
   }
 
-  private renderColumn(
-    parent: HTMLElement,
-    status: ColumnStatus,
-    label: string
-  ) {
-    const filtered = this.getFilteredCards(status);
+  private renderColumn(parent: HTMLElement, columnId: string, label: string) {
+    const filtered = this.getFilteredCards(columnId);
 
     const col = parent.createDiv("kanban-column");
-    col.dataset.status = status;
+    col.dataset.status = columnId;
 
-    // Column header
     const colHeader = col.createDiv("kanban-column-header");
     colHeader.createEl("h2", { text: label, cls: "kanban-column-title" });
     colHeader.createDiv({
@@ -101,16 +94,13 @@ export class KanbanView extends ItemView {
       cls: "kanban-column-count",
     });
 
-    if (status === "todo") {
-      const addBtn = colHeader.createEl("button", {
-        text: "+",
-        cls: "kanban-add-btn",
-        title: "새 카드 추가",
-      });
-      addBtn.addEventListener("click", () => this.openAddModal());
-    }
+    const addBtn = colHeader.createEl("button", {
+      text: "+",
+      cls: "kanban-add-btn",
+      title: "새 카드 추가",
+    });
+    addBtn.addEventListener("click", () => this.openAddModal(columnId));
 
-    // Cards area
     const cardsEl = col.createDiv("kanban-cards");
 
     cardsEl.addEventListener("dragover", (e) => {
@@ -125,8 +115,8 @@ export class KanbanView extends ItemView {
     cardsEl.addEventListener("drop", async (e) => {
       e.preventDefault();
       cardsEl.removeClass("drag-over");
-      if (this.draggedCard && this.draggedCard.status !== status) {
-        await this.fileManager.moveCard(this.draggedCard, status);
+      if (this.draggedCard && this.draggedCard.status !== columnId) {
+        await this.fileManager.moveCard(this.draggedCard, columnId);
         this.draggedCard = null;
         await this.refresh();
       }
@@ -137,15 +127,12 @@ export class KanbanView extends ItemView {
     }
 
     if (filtered.length === 0) {
-      cardsEl.createDiv({
-        text: "카드 없음",
-        cls: "kanban-empty-col",
-      });
+      cardsEl.createDiv({ text: "카드 없음", cls: "kanban-empty-col" });
     }
   }
 
-  private getFilteredCards(status: ColumnStatus): KanbanCard[] {
-    let cards = this.cards.filter((c) => c.status === status);
+  private getFilteredCards(columnId: string): KanbanCard[] {
+    let cards = this.cards.filter((c) => c.status === columnId);
     if (this.activeTagFilter) {
       cards = cards.filter((c) => c.tags.includes(this.activeTagFilter!));
     }
@@ -165,10 +152,8 @@ export class KanbanView extends ItemView {
       cardEl.removeClass("dragging");
     });
 
-    // Title
     cardEl.createDiv({ text: card.title, cls: "kanban-card-title" });
 
-    // Due date
     if (card.due) {
       const today = new Date().toISOString().split("T")[0];
       const overdue = card.due < today && card.status !== "done";
@@ -178,7 +163,6 @@ export class KanbanView extends ItemView {
       });
     }
 
-    // Content preview
     if (card.content) {
       const preview =
         card.content.length > 80
@@ -187,7 +171,6 @@ export class KanbanView extends ItemView {
       cardEl.createDiv({ text: preview, cls: "kanban-card-content" });
     }
 
-    // Tags
     if (card.tags.length > 0) {
       const tagsEl = cardEl.createDiv("kanban-card-tags");
       for (const tag of card.tags) {
@@ -203,7 +186,6 @@ export class KanbanView extends ItemView {
       }
     }
 
-    // Context menu (right-click)
     cardEl.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       const menu = new Menu();
@@ -217,27 +199,15 @@ export class KanbanView extends ItemView {
 
       menu.addSeparator();
 
-      if (card.status !== "todo")
+      for (const col of this.settings.columns) {
+        if (col.id === card.status) continue;
         menu.addItem((item) =>
           item
-            .setTitle("TO-DO로 이동")
-            .setIcon("arrow-left")
-            .onClick(() => this.moveCard(card, "todo"))
-        );
-      if (card.status !== "doing")
-        menu.addItem((item) =>
-          item
-            .setTitle("IN PROGRESS로 이동")
+            .setTitle(`${col.label}(으)로 이동`)
             .setIcon("arrow-right")
-            .onClick(() => this.moveCard(card, "doing"))
+            .onClick(() => this.moveCard(card, col.id))
         );
-      if (card.status !== "done")
-        menu.addItem((item) =>
-          item
-            .setTitle("DONE으로 이동")
-            .setIcon("check")
-            .onClick(() => this.moveCard(card, "done"))
-        );
+      }
 
       menu.addSeparator();
 
@@ -256,14 +226,13 @@ export class KanbanView extends ItemView {
       menu.showAtMouseEvent(e);
     });
 
-    // Click = edit
     cardEl.addEventListener("click", () => this.openEditModal(card));
   }
 
-  private openAddModal() {
+  private openAddModal(columnId: string) {
     new CardModal(this.app, {
       onSubmit: async (data) => {
-        await this.fileManager.createCard({ ...data, status: "todo" });
+        await this.fileManager.createCard({ ...data, status: columnId });
         await this.refresh();
         new Notice("카드가 추가되었습니다!");
       },
@@ -281,8 +250,8 @@ export class KanbanView extends ItemView {
     }).open();
   }
 
-  private async moveCard(card: KanbanCard, newStatus: ColumnStatus) {
-    await this.fileManager.moveCard(card, newStatus);
+  private async moveCard(card: KanbanCard, newColumnId: string) {
+    await this.fileManager.moveCard(card, newColumnId);
     await this.refresh();
   }
 

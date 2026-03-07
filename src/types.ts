@@ -6,25 +6,24 @@ export interface KanbanCard {
   created: string;
   content: string;
   filePath: string;
-  status: ColumnStatus;
+  status: string; // column id
 }
 
-export type ColumnStatus = "todo" | "doing" | "done";
+export interface KanbanColumn {
+  id: string;    // subfolder name
+  label: string; // display name
+}
 
 export interface KanbanSettings {
   boardFolder: string;
+  columns: KanbanColumn[];
 }
 
 export const DEFAULT_SETTINGS: KanbanSettings = {
   boardFolder: "Kanban",
+  columns: [
+    { id: "todo", label: "TO-DO" },
+    { id: "doing", label: "IN PROGRESS" },
+    { id: "done", label: "DONE" },
+  ],
 };
-
-export const COLUMN_CONFIG: {
-  id: ColumnStatus;
-  label: string;
-  folderName: string;
-}[] = [
-  { id: "todo", label: "TO-DO", folderName: "todo" },
-  { id: "doing", label: "IN PROGRESS", folderName: "doing" },
-  { id: "done", label: "DONE", folderName: "done" },
-];

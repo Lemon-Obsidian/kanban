@@ -1,15 +1,13 @@
 import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
-import { KanbanCard, ColumnStatus, KanbanSettings } from "./types";
+import { KanbanCard, KanbanSettings } from "./types";
 import { FileManager } from "./FileManager";
 import { CardModal } from "./CardModal";
 
 export const VIEW_TYPE_TAG_GROUP = "kanban-tag-group-view";
 
-type StatusFilter = ColumnStatus | "all";
-
 export class TagGroupView extends ItemView {
   private cards: KanbanCard[] = [];
-  private statusFilter: StatusFilter = "done";
+  private statusFilter = "all";
   private expandedTags = new Set<string>();
 
   constructor(
@@ -47,21 +45,25 @@ export class TagGroupView extends ItemView {
     const header = containerEl.createDiv("kanban-tag-group-header");
     header.createEl("h2", { text: "태그별 카드 보기" });
 
-    // Status filter buttons
+    // Status filter: 전체 + 각 컬럼
     const filterRow = header.createDiv("kanban-status-filter");
-    const statuses: { value: StatusFilter; label: string }[] = [
-      { value: "all", label: "전체" },
-      { value: "todo", label: "TO-DO" },
-      { value: "doing", label: "IN PROGRESS" },
-      { value: "done", label: "DONE" },
-    ];
-    for (const { value, label } of statuses) {
+
+    const allBtn = filterRow.createEl("button", {
+      text: "전체",
+      cls: `kanban-status-btn ${this.statusFilter === "all" ? "active" : ""}`,
+    });
+    allBtn.addEventListener("click", () => {
+      this.statusFilter = "all";
+      this.render();
+    });
+
+    for (const col of this.settings.columns) {
       const btn = filterRow.createEl("button", {
-        text: label,
-        cls: `kanban-status-btn ${this.statusFilter === value ? "active" : ""}`,
+        text: col.label,
+        cls: `kanban-status-btn ${this.statusFilter === col.id ? "active" : ""}`,
       });
       btn.addEventListener("click", () => {
-        this.statusFilter = value;
+        this.statusFilter = col.id;
         this.render();
       });
     }
@@ -93,12 +95,10 @@ export class TagGroupView extends ItemView {
       return;
     }
 
-    // Sorted tag groups
     for (const [tag, cards] of [...tagGroups.entries()].sort()) {
       this.renderTagGroup(content, tag, cards);
     }
 
-    // Untagged
     if (untagged.length > 0) {
       this.renderTagGroup(content, null, untagged);
     }
@@ -114,7 +114,6 @@ export class TagGroupView extends ItemView {
 
     const group = parent.createDiv("kanban-tag-group");
 
-    // Group header (clickable toggle)
     const groupHeader = group.createDiv("kanban-tag-group-title");
     const arrow = groupHeader.createSpan({ text: isExpanded ? "▼ " : "▶ " });
     groupHeader.createEl("strong", { text: tag ? `#${tag}` : "태그 없음" });
@@ -138,11 +137,10 @@ export class TagGroupView extends ItemView {
       }
     });
 
-    const statusLabel: Record<ColumnStatus, string> = {
-      todo: "TODO",
-      doing: "DOING",
-      done: "DONE",
-    };
+    // Column id → label 맵
+    const columnLabel = Object.fromEntries(
+      this.settings.columns.map((c) => [c.id, c.label])
+    );
     const priorityIcon: Record<string, string> = {
       low: "🔵",
       medium: "🟡",
@@ -153,7 +151,7 @@ export class TagGroupView extends ItemView {
       const row = cardList.createDiv("kanban-tag-card-item");
 
       row.createSpan({
-        text: statusLabel[card.status],
+        text: columnLabel[card.status] ?? card.status,
         cls: `kanban-status-badge status-${card.status}`,
       });
 

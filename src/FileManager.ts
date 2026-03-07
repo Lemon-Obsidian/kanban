@@ -6,22 +6,20 @@ import {
   parseYaml,
   stringifyYaml,
 } from "obsidian";
-import { KanbanCard, ColumnStatus, KanbanSettings } from "./types";
+import { KanbanCard, KanbanSettings } from "./types";
 import { slugify } from "./utils";
 
 export class FileManager {
   constructor(private app: App, private settings: KanbanSettings) {}
 
-  private getColumnPath(status: ColumnStatus): string {
-    return normalizePath(`${this.settings.boardFolder}/${status}`);
+  private getColumnPath(columnId: string): string {
+    return normalizePath(`${this.settings.boardFolder}/${columnId}`);
   }
 
   async ensureFolders(): Promise<void> {
     const paths = [
       this.settings.boardFolder,
-      `${this.settings.boardFolder}/todo`,
-      `${this.settings.boardFolder}/doing`,
-      `${this.settings.boardFolder}/done`,
+      ...this.settings.columns.map((c) => `${this.settings.boardFolder}/${c.id}`),
     ];
     for (const p of paths) {
       const normalized = normalizePath(p);
@@ -47,7 +45,7 @@ export class FileManager {
   private parseFileContent(
     filePath: string,
     raw: string,
-    status: ColumnStatus
+    status: string
   ): KanbanCard {
     const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
     let fm: Record<string, unknown> = {};
@@ -86,22 +84,22 @@ export class FileManager {
     };
   }
 
-  async loadCards(status?: ColumnStatus): Promise<KanbanCard[]> {
-    const statuses: ColumnStatus[] = status
-      ? [status]
-      : ["todo", "doing", "done"];
+  async loadCards(columnId?: string): Promise<KanbanCard[]> {
+    const ids = columnId
+      ? [columnId]
+      : this.settings.columns.map((c) => c.id);
     const cards: KanbanCard[] = [];
 
-    for (const s of statuses) {
+    for (const id of ids) {
       const folder = this.app.vault.getAbstractFileByPath(
-        this.getColumnPath(s)
+        this.getColumnPath(id)
       );
       if (!(folder instanceof TFolder)) continue;
 
       for (const child of folder.children) {
         if (!(child instanceof TFile) || child.extension !== "md") continue;
         const raw = await this.app.vault.read(child);
-        cards.push(this.parseFileContent(child.path, raw, s));
+        cards.push(this.parseFileContent(child.path, raw, id));
       }
     }
 
@@ -111,9 +109,7 @@ export class FileManager {
     );
   }
 
-  async createCard(
-    card: Omit<KanbanCard, "filePath">
-  ): Promise<KanbanCard> {
+  async createCard(card: Omit<KanbanCard, "filePath">): Promise<KanbanCard> {
     await this.ensureFolders();
 
     const slug = slugify(card.title) || `card-${Date.now()}`;
@@ -136,14 +132,14 @@ export class FileManager {
     await this.app.vault.modify(file, this.buildFileContent(card));
   }
 
-  async moveCard(card: KanbanCard, newStatus: ColumnStatus): Promise<void> {
+  async moveCard(card: KanbanCard, newColumnId: string): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(card.filePath);
     if (!(file instanceof TFile)) return;
 
     await this.ensureFolders();
 
     const filename = file.name;
-    const newFolder = this.getColumnPath(newStatus);
+    const newFolder = this.getColumnPath(newColumnId);
     let newPath = normalizePath(`${newFolder}/${filename}`);
 
     let counter = 1;

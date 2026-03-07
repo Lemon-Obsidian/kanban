@@ -1,13 +1,15 @@
 import {
   App,
+  Notice,
   Plugin,
   PluginSettingTab,
   Setting,
 } from "obsidian";
-import { DEFAULT_SETTINGS, KanbanSettings } from "./types";
+import { DEFAULT_SETTINGS, KanbanColumn, KanbanSettings } from "./types";
 import { FileManager } from "./FileManager";
 import { KanbanView, VIEW_TYPE_KANBAN } from "./KanbanView";
 import { TagGroupView, VIEW_TYPE_TAG_GROUP } from "./TagGroupView";
+import { slugify } from "./utils";
 
 export default class KanbanPlugin extends Plugin {
   settings: KanbanSettings;
@@ -19,7 +21,6 @@ export default class KanbanPlugin extends Plugin {
     await this.loadSettings();
     this.fileManager = new FileManager(this.app, this.settings);
 
-    // Register views
     this.registerView(
       VIEW_TYPE_KANBAN,
       (leaf) => new KanbanView(leaf, this.fileManager, this.settings)
@@ -29,15 +30,13 @@ export default class KanbanPlugin extends Plugin {
       (leaf) => new TagGroupView(leaf, this.fileManager, this.settings)
     );
 
-    // Ribbon icons
-    this.addRibbonIcon("layout-kanban", "Kanban 보드 열기", () =>
+    this.addRibbonIcon("columns", "Kanban 보드 열기", () =>
       this.activateView(VIEW_TYPE_KANBAN)
     );
     this.addRibbonIcon("tag", "태그별 보기 열기", () =>
       this.activateView(VIEW_TYPE_TAG_GROUP)
     );
 
-    // Commands
     this.addCommand({
       id: "open-kanban-board",
       name: "Kanban 보드 열기",
@@ -49,10 +48,8 @@ export default class KanbanPlugin extends Plugin {
       callback: () => this.activateView(VIEW_TYPE_TAG_GROUP),
     });
 
-    // Settings tab
     this.addSettingTab(new KanbanSettingTab(this.app, this));
 
-    // Refresh views on vault changes (debounced)
     const scheduleRefresh = () => {
       if (this.refreshTimeout) window.clearTimeout(this.refreshTimeout);
       this.refreshTimeout = window.setTimeout(() => {
@@ -77,7 +74,7 @@ export default class KanbanPlugin extends Plugin {
     workspace.revealLeaf(leaf);
   }
 
-  private refreshAllViews() {
+  refreshAllViews() {
     const leaves = [
       ...this.app.workspace.getLeavesOfType(VIEW_TYPE_KANBAN),
       ...this.app.workspace.getLeavesOfType(VIEW_TYPE_TAG_GROUP),
@@ -88,7 +85,13 @@ export default class KanbanPlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const saved = await this.loadData();
+    this.settings = {
+      ...DEFAULT_SETTINGS,
+      ...saved,
+      // columns가 저장되지 않은 경우 기본값 사용
+      columns: saved?.columns ?? DEFAULT_SETTINGS.columns,
+    };
   }
 
   async saveSettings() {
@@ -102,6 +105,8 @@ export default class KanbanPlugin extends Plugin {
 }
 
 class KanbanSettingTab extends PluginSettingTab {
+  private newColName = "";
+
   constructor(app: App, private plugin: KanbanPlugin) {
     super(app, plugin);
   }
@@ -111,11 +116,10 @@ class KanbanSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.createEl("h2", { text: "Kanban 설정" });
 
+    // ── 보드 폴더 ──
     new Setting(containerEl)
       .setName("보드 폴더")
-      .setDesc(
-        "칸반 카드를 저장할 폴더 경로. 하위에 todo/, doing/, done/ 폴더가 자동 생성됩니다."
-      )
+      .setDesc("카드 파일을 저장할 최상위 폴더 경로")
       .addText((text) =>
         text
           .setPlaceholder("Kanban")
@@ -129,5 +133,131 @@ class KanbanSettingTab extends PluginSettingTab {
             );
           })
       );
+
+    // ── 컬럼 관리 ──
+    containerEl.createEl("h3", { text: "컬럼 관리" });
+    containerEl.createEl("p", {
+      text: "컬럼 순서대로 보드에 표시됩니다. 컬럼 폴더명은 생성 시 자동으로 결정됩니다.",
+      cls: "setting-item-description",
+    });
+
+    const cols = this.plugin.settings.columns;
+
+    for (let i = 0; i < cols.length; i++) {
+      const col = cols[i];
+      const setting = new Setting(containerEl)
+        .setName(`컬럼 ${i + 1}`)
+        .setDesc(`폴더: ${col.id}`);
+
+      setting.addText((text) =>
+        text
+          .setValue(col.label)
+          .onChange(async (v) => {
+            cols[i].label = v.trim() || col.id;
+            await this.plugin.saveSettings();
+            this.plugin.refreshAllViews();
+          })
+      );
+
+      // 위로
+      setting.addButton((btn) =>
+        btn
+          .setIcon("arrow-up")
+          .setTooltip("위로")
+          .setDisabled(i === 0)
+          .onClick(async () => {
+            [cols[i - 1], cols[i]] = [cols[i], cols[i - 1]];
+            await this.plugin.saveSettings();
+            this.plugin.refreshAllViews();
+            this.display();
+          })
+      );
+
+      // 아래로
+      setting.addButton((btn) =>
+        btn
+          .setIcon("arrow-down")
+          .setTooltip("아래로")
+          .setDisabled(i === cols.length - 1)
+          .onClick(async () => {
+            [cols[i], cols[i + 1]] = [cols[i + 1], cols[i]];
+            await this.plugin.saveSettings();
+            this.plugin.refreshAllViews();
+            this.display();
+          })
+      );
+
+      // 삭제
+      setting.addButton((btn) =>
+        btn
+          .setIcon("trash")
+          .setTooltip("컬럼 삭제")
+          .onClick(async () => {
+            if (cols.length <= 1) {
+              new Notice("최소 1개의 컬럼이 필요합니다.");
+              return;
+            }
+            const cards = await this.plugin.fileManager.loadCards(col.id);
+            if (cards.length > 0) {
+              new Notice(
+                `"${col.label}" 컬럼에 카드가 ${cards.length}개 있습니다. 먼저 카드를 이동하거나 삭제하세요.`
+              );
+              return;
+            }
+            cols.splice(i, 1);
+            await this.plugin.saveSettings();
+            this.plugin.refreshAllViews();
+            this.display();
+          })
+      );
+    }
+
+    // ── 새 컬럼 추가 ──
+    containerEl.createEl("h4", { text: "새 컬럼 추가" });
+    new Setting(containerEl)
+      .setName("컬럼 이름")
+      .addText((text) => {
+        text
+          .setPlaceholder("예: 리뷰, Backlog...")
+          .setValue(this.newColName)
+          .onChange((v) => (this.newColName = v));
+        text.inputEl.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") this.addColumn();
+        });
+      })
+      .addButton((btn) =>
+        btn
+          .setButtonText("추가")
+          .setCta()
+          .onClick(() => this.addColumn())
+      );
+  }
+
+  private async addColumn() {
+    const name = this.newColName.trim();
+    if (!name) {
+      new Notice("컬럼 이름을 입력하세요.");
+      return;
+    }
+
+    const existingIds = this.plugin.settings.columns.map((c) => c.id);
+    let id = slugify(name) || `col-${Date.now()}`;
+
+    // 중복 ID 방지
+    if (existingIds.includes(id)) {
+      let n = 2;
+      while (existingIds.includes(`${id}-${n}`)) n++;
+      id = `${id}-${n}`;
+    }
+
+    const newCol: KanbanColumn = { id, label: name };
+    this.plugin.settings.columns.push(newCol);
+    await this.plugin.saveSettings();
+    await this.plugin.fileManager.ensureFolders();
+    this.plugin.refreshAllViews();
+
+    this.newColName = "";
+    this.display();
+    new Notice(`"${name}" 컬럼이 추가되었습니다.`);
   }
 }
