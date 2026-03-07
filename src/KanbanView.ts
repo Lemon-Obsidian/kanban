@@ -1251,14 +1251,28 @@ export class KanbanView extends ItemView {
         this.activeBoard.columns.find((c) => !c.flushable);
       if (!targetCol) continue;
 
+      // 마감일: dueDaysOffset 기준 계산
+      let due: string | undefined;
+      if (task.dueDaysOffset && task.dueDaysOffset > 0) {
+        const d = new Date(now);
+        d.setDate(d.getDate() + task.dueDaysOffset);
+        due = d.toISOString().slice(0, 10);
+      }
+
+      // 내용: 텍스트 + 체크리스트 조합
+      const checklistStr = task.checklist?.length
+        ? formatChecklist(task.checklist.map((t) => ({ text: t, checked: false })))
+        : "";
+      const fullContent = [task.content?.trim() ?? "", checklistStr].filter(Boolean).join("\n\n");
+
       await this.fileManager.createCard({
         title: task.title,
         tags: task.tags,
-        priority: undefined,
-        due: undefined,
+        priority: task.priority,
+        due,
         recur: task.recur,
         created: now.toISOString(),
-        content: "",
+        content: fullContent,
         status: targetCol.id,
       });
 
@@ -1649,10 +1663,15 @@ class RecurringTasksModal extends Modal {
           ? new Date(task.lastCreated).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
           : "아직 생성 안 됨";
 
-        info.createDiv({
-          text: `${formatRecurLabel(task)} · ${targetCol} · 마지막 생성: ${lastStr}`,
-          cls: "kanban-recurring-meta",
-        });
+        const metaParts = [formatRecurLabel(task), targetCol];
+        if (task.priority) {
+          const pLabel: Record<string, string> = { low: "🔵 낮음", medium: "🟡 중간", high: "🔴 높음", asap: "🚨 ASAP" };
+          metaParts.push(pLabel[task.priority]);
+        }
+        if (task.dueDaysOffset) metaParts.push(`📅 +${task.dueDaysOffset}일`);
+        if (task.checklist?.length) metaParts.push(`☑ ${task.checklist.length}개`);
+        metaParts.push(`마지막 생성: ${lastStr}`);
+        info.createDiv({ text: metaParts.join(" · "), cls: "kanban-recurring-meta" });
 
         const delBtn = row.createEl("button", { text: "삭제", cls: "kanban-recurring-del-btn mod-warning" });
         delBtn.addEventListener("click", async () => {
@@ -1673,6 +1692,10 @@ class RecurringTasksModal extends Modal {
     let newDayOfWeek: number | undefined = undefined;
     let newDayOfMonth: number | undefined = undefined;
     let newTargetCol = this.board.columns.find((c) => !c.flushable)?.id ?? this.board.columns[0]?.id ?? "";
+    let newPriority: RecurringTask["priority"] = undefined;
+    let newDueDaysOffset = 0;
+    let newContent = "";
+    let newChecklist = ""; // 줄바꿈으로 구분
 
     new Setting(contentEl)
       .setName("작업 제목 *")
@@ -1733,14 +1756,59 @@ class RecurringTasksModal extends Modal {
         dd.onChange((v) => (newTargetCol = v));
       });
 
+    new Setting(contentEl)
+      .setName("우선순위")
+      .addDropdown((dd) => {
+        dd.addOption("", "없음");
+        dd.addOption("low",    "🔵 낮음");
+        dd.addOption("medium", "🟡 중간");
+        dd.addOption("high",   "🔴 높음");
+        dd.addOption("asap",   "🚨 ASAP");
+        dd.setValue(newPriority ?? "");
+        dd.onChange((v) => { newPriority = (v || undefined) as RecurringTask["priority"]; });
+      });
+
+    new Setting(contentEl)
+      .setName("마감일 오프셋")
+      .setDesc("생성일 기준 N일 후 마감 (0 = 없음)")
+      .addText((t) => {
+        t.inputEl.type = "number";
+        t.inputEl.min = "0";
+        t.inputEl.style.width = "80px";
+        t.setValue("0");
+        t.onChange((v) => { newDueDaysOffset = Math.max(0, parseInt(v) || 0); });
+      });
+
+    new Setting(contentEl)
+      .setName("내용")
+      .addTextArea((area) => {
+        area.setPlaceholder("카드 내용 (선택 사항)...").onChange((v) => (newContent = v));
+        area.inputEl.rows = 3;
+        area.inputEl.style.width = "100%";
+      });
+
+    new Setting(contentEl)
+      .setName("체크리스트")
+      .setDesc("한 줄에 한 항목씩 입력")
+      .addTextArea((area) => {
+        area.setPlaceholder("항목 1\n항목 2\n항목 3").onChange((v) => (newChecklist = v));
+        area.inputEl.rows = 3;
+        area.inputEl.style.width = "100%";
+      });
+
     const addBtn = contentEl.createEl("button", { text: "추가", cls: "mod-cta" });
     addBtn.addEventListener("click", async () => {
       if (!newTitle.trim()) { new Notice("작업 제목을 입력하세요."); return; }
+      const checklist = newChecklist.split("\n").map((s) => s.trim()).filter(Boolean);
       const task: RecurringTask = {
         id: `recur-${Date.now()}`,
         boardId: this.board.id,
         title: newTitle.trim(),
         tags: [],
+        priority: newPriority,
+        content: newContent.trim() || undefined,
+        checklist: checklist.length > 0 ? checklist : undefined,
+        dueDaysOffset: newDueDaysOffset > 0 ? newDueDaysOffset : undefined,
         recur: newRecur,
         dayOfWeek: newDayOfWeek,
         dayOfMonth: newDayOfMonth,

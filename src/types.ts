@@ -34,6 +34,10 @@ export interface RecurringTask {
   boardId: string;
   title: string;
   tags: string[];
+  priority?: "low" | "medium" | "high" | "asap";
+  content?: string;
+  checklist?: string[];    // 체크리스트 항목 텍스트 목록 (생성 시 전부 미체크)
+  dueDaysOffset?: number;  // 생성일 기준 N일 후 마감 (0 또는 undefined = 없음)
   recur: "daily" | "weekly" | "monthly";
   dayOfWeek?: number;  // 0=일, 1=월, ..., 6=토 (weekly 전용)
   dayOfMonth?: number; // 1~31 (monthly 전용)
