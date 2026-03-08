@@ -3,8 +3,8 @@
   "name": "@lemon/kanban",
   "version": "2.0.4",
   "minAppVersion": "1.0.0",
-  "description": "Kanban board with hashtag filtering and tag-group view for completed cards.",
+  "description": "Obsidian용 칸반 보드 플러그인",
   "author": "lemon",
-  "authorUrl": "",
+  "authorUrl": "https://github.com/Lemon-Obsidian/kanban",
   "isDesktopOnly": false
 }
