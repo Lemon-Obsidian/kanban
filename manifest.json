@@ -1,7 +1,7 @@
 {
   "id": "lemon-kanban",
   "name": "@lemon/kanban",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "minAppVersion": "1.0.0",
   "description": "Obsidian용 칸반 보드 플러그인",
   "author": "lemon",
