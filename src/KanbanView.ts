@@ -705,7 +705,8 @@ export class KanbanView extends ItemView {
     hint.innerHTML =
       `<span>#태그</span> 태그 &nbsp;·&nbsp; ` +
       `<span>!낮음 !중간 !높음 !ASAP</span> 우선순위<br>` +
-      `<span>^2026-03-15</span> · <span>^3/15</span> · <span>^오늘</span> · <span>^내일</span> · <span>^N일후</span> &nbsp;마감일`;
+      `<span>^오늘</span> · <span>^내일</span> · <span>^N일후</span> · <span>^월~일</span> &nbsp;마감일<br>` +
+      `<span>https://...</span> 링크 &nbsp;·&nbsp; <span>[이름]https://...</span> 이름 있는 링크`;
     quickInput.addEventListener("keydown", async (e) => {
       if (e.key === "Enter") {
         const raw = quickInput.value.trim();
@@ -874,6 +875,42 @@ export class KanbanView extends ItemView {
       }
     }
 
+    // 링크
+    if (card.links && card.links.length > 0) {
+      const linksEl = cardEl.createDiv("kanban-card-links");
+      const openLink = (url: string) => window.open(url, "_blank", "noopener");
+
+      if (card.links.length <= 3) {
+        for (const link of card.links) {
+          const badge = linksEl.createEl("a", {
+            cls: "kanban-link-badge",
+            text: link.name ?? this.shortenUrl(link.url),
+            title: link.url,
+          });
+          badge.addEventListener("click", (e) => { e.stopPropagation(); openLink(link.url); });
+        }
+      } else {
+        const btn = linksEl.createEl("button", {
+          cls: "kanban-link-badge kanban-link-more-btn",
+          text: `🔗 링크 ${card.links.length}개`,
+        });
+        const dropdown = linksEl.createDiv("kanban-link-dropdown");
+        dropdown.style.display = "none";
+        for (const link of card.links) {
+          const item = dropdown.createDiv({ cls: "kanban-link-dropdown-item" });
+          item.createSpan({ text: "🔗", cls: "kanban-link-dropdown-icon" });
+          item.createSpan({ text: link.name ?? this.shortenUrl(link.url), title: link.url, cls: "kanban-link-dropdown-label" });
+          item.addEventListener("click", (e) => { e.stopPropagation(); openLink(link.url); });
+        }
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const isOpen = dropdown.style.display !== "none";
+          dropdown.style.display = isOpen ? "none" : "block";
+        });
+        document.addEventListener("click", () => { dropdown.style.display = "none"; }, { once: false });
+      }
+    }
+
     // 날짜 footer (생성일 · 수정일)
     const footerEl = cardEl.createDiv("kanban-card-footer");
     const createdMs = new Date(card.created).getTime();
@@ -914,6 +951,15 @@ export class KanbanView extends ItemView {
     });
 
     cardEl.addEventListener("click", () => this.openDetailPanel(card));
+  }
+
+  private shortenUrl(url: string): string {
+    try {
+      const u = new URL(url);
+      return u.hostname.replace(/^www\./, "");
+    } catch {
+      return url.slice(0, 20) + (url.length > 20 ? "…" : "");
+    }
   }
 
   private get allExistingTags(): string[] {
@@ -1428,6 +1474,7 @@ export class KanbanView extends ItemView {
     tags: string[];
     priority?: KanbanCard["priority"];
     due?: string;
+    links?: { url: string; name?: string }[];
   } {
     const PRIORITY_MAP: Record<string, KanbanCard["priority"]> = {
       "!낮음": "low", "!중간": "medium", "!높음": "high", "!ASAP": "asap", "!asap": "asap",
@@ -1436,6 +1483,7 @@ export class KanbanView extends ItemView {
     const tags: string[] = [];
     let priority: KanbanCard["priority"] | undefined;
     let due: string | undefined;
+    const links: { url: string; name?: string }[] = [];
     const titleTokens: string[] = [];
 
     for (const token of raw.trim().split(/\s+/)) {
@@ -1445,12 +1493,17 @@ export class KanbanView extends ItemView {
         priority = PRIORITY_MAP[token];
       } else if (token.startsWith("^") && token.length > 1) {
         due = this.parseQuickDue(token.slice(1));
+      } else if (/^https?:\/\/\S+/.test(token)) {
+        links.push({ url: token });
+      } else if (/^\[.+\]https?:\/\/\S+/.test(token)) {
+        const m = token.match(/^\[(.+)\](https?:\/\/\S+)/);
+        if (m) links.push({ name: m[1], url: m[2] });
       } else {
         titleTokens.push(token);
       }
     }
 
-    return { title: titleTokens.join(" "), tags, priority, due };
+    return { title: titleTokens.join(" "), tags, priority, due, links: links.length > 0 ? links : undefined };
   }
 
   private parseQuickDue(raw: string): string {

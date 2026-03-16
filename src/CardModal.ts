@@ -1,5 +1,5 @@
 import { App, Modal, Setting, TFile } from "obsidian";
-import { KanbanCard } from "./types";
+import { CardLink, KanbanCard } from "./types";
 import { parseTags, formatTags, ChecklistItem, parseChecklist, formatChecklist } from "./utils";
 
 interface CardModalOptions {
@@ -14,6 +14,7 @@ export class CardModal extends Modal {
   private due = "";
   private priority: "low" | "medium" | "high" | "asap" = "medium";
   private recur: "daily" | "weekly" | "monthly" | "" = "";
+  private links: CardLink[] = [];
   private textContent = "";
   private checklistItems: ChecklistItem[] = [];
 
@@ -25,6 +26,7 @@ export class CardModal extends Modal {
       this.due = options.card.due ?? "";
       this.priority = options.card.priority ?? "medium";
       this.recur = options.card.recur ?? "";
+      this.links = options.card.links ? options.card.links.map((l) => ({ ...l })) : [];
       const { items, text } = parseChecklist(options.card.content);
       this.checklistItems = items;
       this.textContent = text;
@@ -194,6 +196,41 @@ export class CardModal extends Modal {
     });
     attachWikilinkSuggest(this.app, contentAreaEl!);
 
+    // Links
+    const linksSection = contentEl.createDiv("kanban-checklist-section");
+    linksSection.createEl("div", { text: "링크", cls: "kanban-checklist-header" });
+    const linksContainer = linksSection.createDiv("kanban-checklist-items");
+    const renderLinks = () => {
+      linksContainer.empty();
+      for (let i = 0; i < this.links.length; i++) {
+        const row = linksContainer.createDiv("kanban-link-edit-row");
+
+        const nameInput = row.createEl("input");
+        nameInput.type = "text";
+        nameInput.value = this.links[i].name ?? "";
+        nameInput.placeholder = "이름 (선택)";
+        nameInput.className = "kanban-link-edit-name";
+        nameInput.addEventListener("input", () => { this.links[i].name = nameInput.value || undefined; });
+
+        const urlInput = row.createEl("input");
+        urlInput.type = "url";
+        urlInput.value = this.links[i].url;
+        urlInput.placeholder = "https://...";
+        urlInput.className = "kanban-link-edit-url";
+        urlInput.addEventListener("input", () => { this.links[i].url = urlInput.value; });
+
+        const delBtn = row.createEl("button", { text: "×", cls: "kanban-checklist-del-btn" });
+        delBtn.addEventListener("click", () => { this.links.splice(i, 1); renderLinks(); });
+      }
+    };
+    renderLinks();
+    const addLinkBtn = linksSection.createEl("button", { text: "+ 링크 추가", cls: "kanban-checklist-add-btn" });
+    addLinkBtn.addEventListener("click", () => {
+      this.links.push({ url: "" });
+      renderLinks();
+      linksContainer.querySelectorAll<HTMLInputElement>(".kanban-link-edit-url")[this.links.length - 1]?.focus();
+    });
+
     // Checklist
     const checklistSection = contentEl.createDiv("kanban-checklist-section");
     checklistSection.createEl("div", { text: "체크리스트", cls: "kanban-checklist-header" });
@@ -289,12 +326,14 @@ export class CardModal extends Modal {
     const checklistStr = formatChecklist(validItems);
     const fullContent = [this.textContent.trim(), checklistStr].filter(Boolean).join("\n\n");
 
+    const validLinks = this.links.filter((l) => l.url.trim());
     this.options.onSubmit({
       title: this.title.trim(),
       tags: parseTags(this.tags),
       due: this.due || undefined,
       priority: this.priority,
       recur: this.recur || undefined,
+      links: validLinks.length > 0 ? validLinks : undefined,
       created: this.options.card?.created ?? new Date().toISOString(),
       content: fullContent,
       status: this.options.card?.status ?? "todo",

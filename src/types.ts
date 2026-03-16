@@ -1,3 +1,8 @@
+export interface CardLink {
+  url: string;
+  name?: string;
+}
+
 export interface KanbanCard {
   title: string;
   tags: string[];
@@ -6,6 +11,7 @@ export interface KanbanCard {
   created: string;
   mtime?: number; // file modification time (ms)
   recur?: "daily" | "weekly" | "monthly";
+  links?: CardLink[];
   content: string;
   filePath: string;
   status: string; // column id

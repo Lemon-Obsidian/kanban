@@ -6,7 +6,7 @@ import {
   parseYaml,
   stringifyYaml,
 } from "obsidian";
-import { ArchivedCard, KanbanBoard, KanbanCard } from "./types";
+import { ArchivedCard, CardLink, KanbanBoard, KanbanCard } from "./types";
 import { slugify } from "./utils";
 
 export class FileManager {
@@ -60,6 +60,7 @@ export class FileManager {
     if (card.due) fm.due = card.due;
     if (card.priority) fm.priority = card.priority;
     if (card.recur) fm.recur = card.recur;
+    if (card.links && card.links.length > 0) fm.links = card.links;
 
     const yaml = stringifyYaml(fm).trim();
     const body = card.content ? `\n\n${card.content}` : "";
@@ -104,6 +105,14 @@ export class FileManager {
         fm.recur === "daily" || fm.recur === "weekly" || fm.recur === "monthly"
           ? fm.recur
           : undefined,
+      links: Array.isArray(fm.links)
+        ? (fm.links as Array<{ url?: unknown; name?: unknown }>)
+            .filter((l) => typeof l?.url === "string")
+            .map((l) => ({
+              url: l.url as string,
+              ...(typeof l.name === "string" ? { name: l.name } : {}),
+            })) as CardLink[]
+        : undefined,
       content,
       filePath,
       status,
@@ -308,6 +317,7 @@ export class FileManager {
     };
     if (card.due) fm.due = card.due;
     if (card.priority) fm.priority = card.priority;
+    if (card.links && card.links.length > 0) fm.links = card.links;
 
     const yaml = stringifyYaml(fm).trim();
     const body = card.content ? `\n\n${card.content}` : "";
