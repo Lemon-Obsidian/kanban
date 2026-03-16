@@ -1315,7 +1315,11 @@ export class KanbanView extends ItemView {
 
   private attachQuickAddSuggest(input: HTMLInputElement, wrapper: HTMLElement) {
     const PRIORITY_OPTIONS = ["!낮음", "!중간", "!높음", "!ASAP"];
-    const DUE_OPTIONS = ["^오늘", "^내일", "^3일후", "^7일후", "^30일후"];
+    const DUE_OPTIONS = [
+      "^오늘", "^내일", "^모레",
+      "^월", "^화", "^수", "^목", "^금", "^토", "^일",
+      "^3일후", "^7일후", "^14일후", "^30일후",
+    ];
 
     const dropdown = wrapper.createDiv("kanban-tag-dropdown");
     dropdown.style.display = "none";
@@ -1451,24 +1455,36 @@ export class KanbanView extends ItemView {
 
   private parseQuickDue(raw: string): string {
     const today = new Date();
-    if (raw === "오늘") return today.toISOString().slice(0, 10);
-    if (raw === "내일") {
+    const addDays = (n: number) => {
       const d = new Date(today);
-      d.setDate(d.getDate() + 1);
+      d.setDate(d.getDate() + n);
       return d.toISOString().slice(0, 10);
+    };
+
+    if (raw === "오늘") return addDays(0);
+    if (raw === "내일") return addDays(1);
+    if (raw === "모레") return addDays(2);
+
+    // 요일 → 가장 가까운 미래 해당 요일 (오늘 제외)
+    const DAY_MAP: Record<string, number> = {
+      "일": 0, "월": 1, "화": 2, "수": 3, "목": 4, "금": 5, "토": 6,
+    };
+    if (DAY_MAP[raw] !== undefined) {
+      const target = DAY_MAP[raw];
+      const diff = ((target - today.getDay() + 7) % 7) || 7;
+      return addDays(diff);
     }
-    // N일후 / N일 후
+
+    // N일후
     const nDays = raw.match(/^(\d+)일\s*후$/);
-    if (nDays) {
-      const d = new Date(today);
-      d.setDate(d.getDate() + parseInt(nDays[1]));
-      return d.toISOString().slice(0, 10);
-    }
+    if (nDays) return addDays(parseInt(nDays[1]));
+
     // MM/DD → 올해 YYYY-MM-DD
     const mmdd = raw.match(/^(\d{1,2})\/(\d{1,2})$/);
     if (mmdd) {
       return `${today.getFullYear()}-${mmdd[1].padStart(2, "0")}-${mmdd[2].padStart(2, "0")}`;
     }
+
     // YYYY-MM-DD 그대로
     if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
     return raw;
