@@ -522,6 +522,7 @@
 
 .kanban-card {
   position: relative;
+  flex-shrink: 0;
   background: var(--background-primary);
   border-radius: 9px;
   padding: 11px 12px 10px;
