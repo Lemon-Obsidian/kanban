@@ -1061,6 +1061,17 @@
   flex-shrink: 0;
 }
 
+.kanban-quick-add-wrap {
+  position: relative;
+}
+
+.kanban-quick-add-wrap .kanban-tag-dropdown {
+  top: auto;
+  bottom: calc(100% + 3px);
+  left: 0;
+  right: 0;
+}
+
 .kanban-quick-add-input {
   width: 100%;
   padding: 6px 10px;

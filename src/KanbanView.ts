@@ -693,11 +693,13 @@ export class KanbanView extends ItemView {
 
     // 퀵 추가
     const quickAddEl = col.createDiv("kanban-quick-add");
-    const quickInput = quickAddEl.createEl("input", {
+    const quickInputWrap = quickAddEl.createDiv("kanban-quick-add-wrap");
+    const quickInput = quickInputWrap.createEl("input", {
       type: "text",
       cls: "kanban-quick-add-input",
     });
     quickInput.placeholder = "+ 카드 추가...";
+    this.attachQuickAddSuggest(quickInput, quickInputWrap);
 
     const hint = quickAddEl.createDiv("kanban-quick-add-hint");
     hint.innerHTML =
@@ -1310,6 +1312,112 @@ export class KanbanView extends ItemView {
   }
 
   // ── 빠른 입력 파서 ────────────────────────────────────────────────────────
+
+  private attachQuickAddSuggest(input: HTMLInputElement, wrapper: HTMLElement) {
+    const PRIORITY_OPTIONS = ["!낮음", "!중간", "!높음", "!ASAP"];
+    const DUE_OPTIONS = ["^오늘", "^내일", "^3일후", "^7일후", "^30일후"];
+
+    const dropdown = wrapper.createDiv("kanban-tag-dropdown");
+    dropdown.style.display = "none";
+    let activeIndex = -1;
+
+    const getActiveToken = (): { token: string; start: number; end: number } => {
+      const val = input.value;
+      const pos = input.selectionStart ?? val.length;
+      let start = pos;
+      while (start > 0 && val[start - 1] !== " ") start--;
+      return { token: val.slice(start, pos), start, end: pos };
+    };
+
+    const getAllTags = (): string[] => {
+      const tagSet = new Set<string>();
+      for (const card of this.cards) {
+        for (const tag of card.tags) tagSet.add(tag);
+      }
+      return [...tagSet].sort();
+    };
+
+    const hide = () => {
+      dropdown.style.display = "none";
+      dropdown.empty();
+      activeIndex = -1;
+    };
+
+    const selectItem = (value: string) => {
+      const { start, end } = getActiveToken();
+      const before = input.value.slice(0, start);
+      const after = input.value.slice(end);
+      input.value = `${before}${value} ${after.trimStart()}`;
+      const newPos = start + value.length + 1;
+      input.setSelectionRange(newPos, newPos);
+      hide();
+      input.focus();
+    };
+
+    const updateDropdown = () => {
+      const { token } = getActiveToken();
+      let candidates: string[] = [];
+
+      if (token.startsWith("#")) {
+        const query = token.slice(1).toLowerCase();
+        const usedTags = new Set(
+          input.value.split(/\s+/)
+            .filter(t => t.startsWith("#") && t !== token)
+            .map(t => t.slice(1))
+        );
+        const allTags = getAllTags().filter(t => !usedTags.has(t));
+        candidates = query
+          ? allTags.filter(t => t.toLowerCase().includes(query)).map(t => `#${t}`)
+          : allTags.map(t => `#${t}`);
+      } else if (token.startsWith("!")) {
+        const query = token.toLowerCase();
+        candidates = query === "!"
+          ? PRIORITY_OPTIONS
+          : PRIORITY_OPTIONS.filter(p => p.toLowerCase().startsWith(query));
+      } else if (token.startsWith("^")) {
+        const query = token.toLowerCase();
+        candidates = query === "^"
+          ? DUE_OPTIONS
+          : DUE_OPTIONS.filter(d => d.toLowerCase().startsWith(query));
+      }
+
+      if (candidates.length === 0) { hide(); return; }
+
+      dropdown.empty();
+      activeIndex = -1;
+      for (const cand of candidates.slice(0, 8)) {
+        const item = dropdown.createDiv({ text: cand, cls: "kanban-tag-dropdown-item" });
+        item.addEventListener("mousedown", (e) => { e.preventDefault(); selectItem(cand); });
+      }
+      dropdown.style.display = "block";
+    };
+
+    input.addEventListener("input", updateDropdown);
+    input.addEventListener("keydown", (e) => {
+      if (dropdown.style.display === "none") return;
+      const items = dropdown.querySelectorAll<HTMLElement>(".kanban-tag-dropdown-item");
+      if (items.length === 0) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeIndex = (activeIndex + 1) % items.length;
+        items.forEach((el, i) => el.classList.toggle("active", i === activeIndex));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeIndex = (activeIndex - 1 + items.length) % items.length;
+        items.forEach((el, i) => el.classList.toggle("active", i === activeIndex));
+      } else if ((e.key === "Enter" || e.key === "Tab") && activeIndex >= 0) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        selectItem(items[activeIndex].textContent!);
+      } else if (e.key === "Escape") {
+        e.stopImmediatePropagation();
+        hide();
+      }
+    });
+
+    input.addEventListener("blur", () => setTimeout(hide, 150));
+  }
 
   private parseQuickInput(raw: string): {
     title: string;
