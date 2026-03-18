@@ -1130,10 +1130,9 @@ export class KanbanView extends ItemView {
     for (const [tag, groupCards] of groups) {
       lines.push(tag === NO_TAG ? `## (태그 없음)` : `## #${tag}`);
       for (const card of groupCards) {
-        const meta: string[] = [];
-        if (card.priority && card.priority !== "medium") meta.push(`\`${priorityLabel[card.priority]}\``);
-        if (card.due) meta.push(`\`📅 ${card.due}\``);
-        lines.push(`- ${card.title}${meta.length ? " " + meta.join(" ") : ""}`);
+        lines.push(`- ${card.title}`);
+        if (card.priority && card.priority !== "medium") lines.push(`  * 우선순위 ${priorityLabel[card.priority]}`);
+        if (card.due) lines.push(`  * 마감일 ${card.due}`);
         const { text, items: checklistItems } = parseChecklist(card.content);
         if (text) {
           for (const line of text.split("\n")) {
