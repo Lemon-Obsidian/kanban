@@ -4,9 +4,9 @@
 
 **Obsidian용 칸반 보드 플러그인**
 
-멀티 보드 · 해시태그 필터링 · 우선순위 · 체크리스트 · 반복 작업 스케줄러 · 키보드 단축키 · 아카이브
+멀티 보드 · 해시태그 필터링 · 우선순위 · WIP 리밋 · 체크리스트 · 외부 링크 · 반복 작업 스케줄러 · 키보드 단축키 · 아카이브
 
-[![Release](https://img.shields.io/badge/release-2.0.4-6c63ff?style=flat-square)](https://github.com/Lemon-Obsidian/kanban/releases/latest)
+[![Release](https://img.shields.io/badge/release-2.0.13-6c63ff?style=flat-square)](https://github.com/Lemon-Obsidian/kanban/releases/latest)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.0%2B-7c3aed?style=flat-square&logo=obsidian&logoColor=white)](https://obsidian.md)
 [![License](https://img.shields.io/github/license/Lemon-Obsidian/kanban?style=flat-square&color=10b981)](LICENSE)
 
@@ -32,6 +32,7 @@
 | 🚦 **WIP 리밋** | 컬럼별 최대 카드 수 설정 · 초과 시 카운트 뱃지 빨간색으로 경고 |
 | 🔁 **반복 작업 스케줄러** | 매일 / 매주(요일 지정) / 매월(날짜 지정) 스케줄로 Kanban 뷰 열 때 자동 카드 생성 |
 | ⚡ **빠른 카드 추가** | 컬럼 하단 입력창에서 `#태그 !높음 ^3/15` 인라인 문법으로 즉시 카드 생성 |
+| 🔗 **외부 링크** | 카드에 URL 다중 첨부 · 이름 지정 가능 · 도메인 파비콘 자동 표시 |
 | 🔗 **내부 링크** | 카드 내용의 `[[노트명]]` · `[[노트명\|별칭]]` 클릭 시 해당 노트 바로 열기 |
 | 🔮 **위키링크 자동완성** | 내용 편집 중 `[[` 입력 시 vault 파일 검색 드롭다운 표시 |
 | ⌨️ **키보드 단축키** | `N` 새 카드 · `/` 검색 · `E` 편집 · `Del` 삭제 · `Esc` 닫기 |
