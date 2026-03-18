@@ -1,4 +1,4 @@
-import { ItemView, Menu, Modal, Notice, Setting, WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, Modal, Notice, Setting, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
 import { ArchivedCard, KanbanBoard, KanbanCard, KanbanColumn, KanbanSettings, RecurringTask } from "./types";
 import { FileManager } from "./FileManager";
 import { CardModal } from "./CardModal";
@@ -1111,7 +1111,6 @@ export class KanbanView extends ItemView {
   // ── 컬럼 Markdown 내보내기 ────────────────────────────────────────────────
 
   private async openColumnMarkdown(columnId: string, label: string) {
-    const { normalizePath } = await import("obsidian");
     const cards = this.cards.filter((c) => c.status === columnId);
 
     // 첫 번째 태그 기준으로 그룹핑
@@ -1151,13 +1150,13 @@ export class KanbanView extends ItemView {
 
     const existing = this.app.vault.getAbstractFileByPath(filePath);
     if (existing) {
-      await this.app.vault.modify(existing as import("obsidian").TFile, content);
+      await this.app.vault.modify(existing as TFile, content);
     } else {
       await this.app.vault.create(filePath, content);
     }
 
     const leaf = this.app.workspace.getLeaf("tab");
-    await leaf.openFile(this.app.vault.getAbstractFileByPath(filePath) as import("obsidian").TFile);
+    await leaf.openFile(this.app.vault.getAbstractFileByPath(filePath) as TFile);
   }
 
   // ── 마감 임박 뷰 ──────────────────────────────────────────────────────────
