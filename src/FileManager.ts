@@ -55,6 +55,7 @@ export class FileManager {
   private buildFileContent(card: KanbanCard): string {
     const fm: Record<string, unknown> = {
       tags: card.tags,
+      status: card.status,
       created: card.created,
     };
     if (card.due) fm.due = card.due;
@@ -311,6 +312,7 @@ export class FileManager {
 
     const fm: Record<string, unknown> = {
       tags: card.tags,
+      status: card.flushedFrom,
       created: card.created,
       flushedAt: card.flushedAt,
       flushedFrom: card.flushedFrom,
@@ -322,5 +324,62 @@ export class FileManager {
     const yaml = stringifyYaml(fm).trim();
     const body = card.content ? `\n\n${card.content}` : "";
     await this.app.vault.modify(file, `---\n${yaml}\n---\n\n# ${card.title}${body}`);
+  }
+
+  // ── Dataview 마이그레이션 ─────────────────────────────────────────────────
+
+  async migrateStatusField(): Promise<number> {
+    let count = 0;
+
+    // 일반 카드
+    for (const col of this.board.columns) {
+      const folder = this.app.vault.getAbstractFileByPath(this.getColumnPath(col.id));
+      if (!(folder instanceof TFolder)) continue;
+      for (const child of folder.children) {
+        if (!(child instanceof TFile) || child.extension !== "md") continue;
+        const raw = await this.app.vault.read(child);
+        const updated = this.injectStatusField(raw, col.id);
+        if (updated !== raw) {
+          await this.app.vault.modify(child, updated);
+          count++;
+        }
+      }
+    }
+
+    // 아카이브 카드
+    const archiveFolder = this.app.vault.getAbstractFileByPath(this.getArchiveBasePath());
+    if (archiveFolder instanceof TFolder) {
+      for (const monthFolder of archiveFolder.children) {
+        if (!(monthFolder instanceof TFolder)) continue;
+        for (const child of monthFolder.children) {
+          if (!(child instanceof TFile) || child.extension !== "md") continue;
+          const raw = await this.app.vault.read(child);
+          const fmMatch = raw.match(/^---\n([\s\S]*?)\n---/);
+          if (!fmMatch) continue;
+          let fm: Record<string, unknown> = {};
+          try { fm = (parseYaml(fmMatch[1]) as Record<string, unknown>) || {}; } catch { continue; }
+          if (fm.status) continue; // 이미 있으면 스킵
+          const statusValue = typeof fm.flushedFrom === "string" ? fm.flushedFrom : "unknown";
+          const updated = this.injectStatusField(raw, statusValue);
+          if (updated !== raw) {
+            await this.app.vault.modify(child, updated);
+            count++;
+          }
+        }
+      }
+    }
+
+    return count;
+  }
+
+  private injectStatusField(raw: string, status: string): string {
+    const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n/);
+    if (!fmMatch) return raw;
+    let fm: Record<string, unknown> = {};
+    try { fm = (parseYaml(fmMatch[1]) as Record<string, unknown>) || {}; } catch { return raw; }
+    if (fm.status) return raw; // 이미 있으면 스킵
+    fm.status = status;
+    const rest = raw.slice(fmMatch[0].length);
+    return `---\n${stringifyYaml(fm).trim()}\n---\n${rest}`;
   }
 }

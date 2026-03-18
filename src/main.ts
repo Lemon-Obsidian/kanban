@@ -175,6 +175,28 @@ class KanbanSettingTab extends PluginSettingTab {
         btn.setButtonText("추가").setCta().onClick(() => this.addBoard())
       );
 
+    // ── Dataview 호환 ──
+    containerEl.createEl("h3", { text: "Dataview 호환" });
+    new Setting(containerEl)
+      .setName("status 필드 마이그레이션")
+      .setDesc("기존 카드 파일에 status 필드를 추가합니다. Dataview로 카드를 조회하려면 한 번 실행하세요.")
+      .addButton((btn) =>
+        btn.setButtonText("마이그레이션 실행").onClick(async () => {
+          btn.setDisabled(true);
+          btn.setButtonText("실행 중...");
+          try {
+            const count = await this.plugin.fileManager.migrateStatusField();
+            new Notice(`마이그레이션 완료 — ${count}개 카드에 status 필드 추가됨`);
+          } catch (e) {
+            new Notice("마이그레이션 중 오류가 발생했습니다.");
+            console.error(e);
+          } finally {
+            btn.setDisabled(false);
+            btn.setButtonText("마이그레이션 실행");
+          }
+        })
+      );
+
     // ── 마감 임박 설정 ──
     containerEl.createEl("h3", { text: "마감 임박 설정" });
     containerEl.createEl("p", {
