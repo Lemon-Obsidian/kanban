@@ -967,8 +967,9 @@ export class KanbanView extends ItemView {
     const img = document.createElement("img");
     img.className = "kanban-link-favicon";
     try {
-      const hostname = new URL(url).hostname;
-      img.src = `https://www.google.com/s2/favicons?domain=${hostname}&sz=16`;
+      const parts = new URL(url).hostname.split(".");
+      const rootDomain = parts.slice(-2).join(".");
+      img.src = `https://www.google.com/s2/favicons?domain=${rootDomain}&sz=16`;
     } catch {
       img.style.display = "none";
     }
