@@ -638,8 +638,12 @@ export class KanbanView extends ItemView {
     dragHandle.addEventListener("mouseup", () => { if (!this.draggedColumnId) col.draggable = false; });
     colHeaderLeft.createEl("h2", { text: label, cls: "kanban-column-title" });
     const countText = wipLimit ? `${allCards.length} / ${wipLimit}` : String(allCards.length);
+    const isAtWip = !!wipLimit && allCards.length === wipLimit;
     const isOverWip = !!wipLimit && allCards.length > wipLimit;
-    colHeaderLeft.createDiv({ text: countText, cls: `kanban-column-count${isOverWip ? " wip-exceeded" : ""}` });
+    const wipCls = isOverWip ? " wip-exceeded" : isAtWip ? " wip-warning" : "";
+    colHeaderLeft.createDiv({ text: countText, cls: `kanban-column-count${wipCls}` });
+    if (isAtWip) col.addClass("wip-warning");
+    else if (isOverWip) col.addClass("wip-exceeded");
 
     const colHeaderRight = colHeader.createDiv("kanban-column-header-right");
 

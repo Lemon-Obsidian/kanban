@@ -423,9 +423,24 @@
   flex-shrink: 0;
 }
 
+.kanban-column-count.wip-warning {
+  background: rgba(230, 126, 34, 0.15);
+  color: #e67e22;
+}
+
 .kanban-column-count.wip-exceeded {
   background: rgba(231, 76, 60, 0.15);
   color: #e74c3c;
+}
+
+.kanban-column.wip-warning {
+  border: 2px solid #e67e22;
+  border-radius: 8px;
+}
+
+.kanban-column.wip-exceeded {
+  border: 2px solid #e74c3c;
+  border-radius: 8px;
 }
 
 .kanban-column-header-right {
