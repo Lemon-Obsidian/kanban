@@ -257,7 +257,7 @@ type SortBy = "created" | "due" | "priority" | "title";
 export class KanbanView extends ItemView {
   private cards: KanbanCard[] = [];
   private draggedCard: KanbanCard | null = null;
-  private activeTagFilter: string | null = null;
+  private activeTagFilters: Set<string> = new Set();
   private boardSearch = "";
   private sortBy: SortBy = "created";
   private sortDir: "asc" | "desc" = "desc";
@@ -365,7 +365,7 @@ export class KanbanView extends ItemView {
           await this.saveSettings();
           await this.fileManager.ensureFolders();
           this.boardSearch = "";
-          this.activeTagFilter = null;
+          this.activeTagFilters.clear();
           await this.refresh();
           new Notice(`"${newBoard.name}" 보드가 생성되었습니다.`);
         }
@@ -532,12 +532,16 @@ export class KanbanView extends ItemView {
       btn.addEventListener("click", onClick);
     };
 
-    makeTagBtn("전체", this.cards.length, this.activeTagFilter === null,
-      () => { this.activeTagFilter = null; this.render(); });
+    makeTagBtn("전체", this.cards.length, this.activeTagFilters.size === 0,
+      () => { this.activeTagFilters.clear(); this.render(); });
 
     for (const tag of [...allTags].sort()) {
-      makeTagBtn(`#${tag}`, tagCount.get(tag) ?? 0, this.activeTagFilter === tag,
-        () => { this.activeTagFilter = this.activeTagFilter === tag ? null : tag; this.render(); });
+      makeTagBtn(`#${tag}`, tagCount.get(tag) ?? 0, this.activeTagFilters.has(tag),
+        () => {
+          if (this.activeTagFilters.has(tag)) this.activeTagFilters.delete(tag);
+          else this.activeTagFilters.add(tag);
+          this.render();
+        });
     }
   }
 
@@ -730,8 +734,8 @@ export class KanbanView extends ItemView {
 
   private getFilteredCards(columnId: string): KanbanCard[] {
     let cards = this.cards.filter((c) => c.status === columnId);
-    if (this.activeTagFilter) {
-      cards = cards.filter((c) => c.tags.includes(this.activeTagFilter!));
+    if (this.activeTagFilters.size > 0) {
+      cards = cards.filter((c) => c.tags.some((t) => this.activeTagFilters.has(t)));
     }
     if (this.boardSearch) {
       const q = this.boardSearch.toLowerCase();
@@ -861,7 +865,7 @@ export class KanbanView extends ItemView {
       const tagQ = this.boardSearch.startsWith("#") ? this.boardSearch.slice(1).toLowerCase() : "";
       for (const tag of card.tags) {
         const tagEl = tagsEl.createEl("span", {
-          cls: `kanban-tag${this.activeTagFilter === tag ? " active" : ""}`,
+          cls: `kanban-tag${this.activeTagFilters.has(tag) ? " active" : ""}`,
         });
         if (tagQ) {
           tagEl.appendText("#");
@@ -871,7 +875,8 @@ export class KanbanView extends ItemView {
         }
         tagEl.addEventListener("click", (e) => {
           e.stopPropagation();
-          this.activeTagFilter = this.activeTagFilter === tag ? null : tag;
+          if (this.activeTagFilters.has(tag)) this.activeTagFilters.delete(tag);
+          else this.activeTagFilters.add(tag);
           this.render();
         });
       }
