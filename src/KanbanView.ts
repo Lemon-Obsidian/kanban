@@ -295,7 +295,7 @@ class WipLimitModal extends Modal {
 // ── KanbanView ────────────────────────────────────────────────────────────
 
 type ViewMode = "board" | "archive" | "upcoming";
-type SortBy = "created" | "due" | "priority" | "title";
+type SortBy = "created" | "due" | "priority" | "title" | "tag";
 
 export class KanbanView extends ItemView {
   private cards: KanbanCard[] = [];
@@ -455,6 +455,7 @@ export class KanbanView extends ItemView {
       { value: "due",      label: "마감일" },
       { value: "priority", label: "우선순위" },
       { value: "title",    label: "제목" },
+      { value: "tag",      label: "태그" },
     ];
 
     const updateSortButtons = () => {
@@ -827,6 +828,12 @@ export class KanbanView extends ItemView {
         case "title":
           cmp = a.title.localeCompare(b.title, "ko");
           break;
+        case "tag": {
+          const aTag = a.tags[0] ?? "\uffff";
+          const bTag = b.tags[0] ?? "\uffff";
+          cmp = aTag.localeCompare(bTag, "ko");
+          break;
+        }
       }
       return this.sortDir === "asc" ? cmp : -cmp;
     });
