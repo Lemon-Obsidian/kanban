@@ -689,6 +689,11 @@ export class KanbanView extends ItemView {
         })
       );
       menu.addItem((item) =>
+        item.setTitle("Markdown으로 보기").setIcon("file-text").onClick(() =>
+          this.openColumnMarkdown(columnId, label)
+        )
+      );
+      menu.addItem((item) =>
         item.setTitle("WIP 리밋 설정").setIcon("gauge").onClick(() => {
           const col = this.activeBoard.columns.find((c) => c.id === columnId);
           if (!col) return;
@@ -1101,6 +1106,58 @@ export class KanbanView extends ItemView {
       new Notice(`${flushed}개의 카드가 아카이브에 보관되었습니다.`);
       await this.refresh();
     }).open();
+  }
+
+  // ── 컬럼 Markdown 내보내기 ────────────────────────────────────────────────
+
+  private async openColumnMarkdown(columnId: string, label: string) {
+    const { normalizePath } = await import("obsidian");
+    const cards = this.cards.filter((c) => c.status === columnId);
+
+    // 첫 번째 태그 기준으로 그룹핑
+    const groups = new Map<string, KanbanCard[]>();
+    const NO_TAG = "\x00";
+    for (const card of [...cards].sort((a, b) =>
+      (a.tags[0] ?? "\uffff").localeCompare(b.tags[0] ?? "\uffff", "ko")
+    )) {
+      const key = card.tags[0] ?? NO_TAG;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(card);
+    }
+
+    // Markdown 생성
+    const lines: string[] = [`# ${label}\n`];
+    for (const [tag, groupCards] of groups) {
+      lines.push(tag === NO_TAG ? `## (태그 없음)` : `## #${tag}`);
+      for (const card of groupCards) {
+        lines.push(`- ${card.title}`);
+        const { text } = parseChecklist(card.content);
+        if (text) {
+          const firstLine = text.split("\n")[0].trim();
+          if (firstLine) lines.push(`  ${firstLine}`);
+        }
+      }
+      lines.push("");
+    }
+    const content = lines.join("\n");
+
+    // 임시 파일 생성/덮어쓰기 후 열기
+    const exportDir = normalizePath(`${this.activeBoard.folder}/_export`);
+    const filePath = normalizePath(`${exportDir}/${columnId}.md`);
+
+    if (!this.app.vault.getAbstractFileByPath(exportDir)) {
+      await this.app.vault.createFolder(exportDir);
+    }
+
+    const existing = this.app.vault.getAbstractFileByPath(filePath);
+    if (existing) {
+      await this.app.vault.modify(existing as import("obsidian").TFile, content);
+    } else {
+      await this.app.vault.create(filePath, content);
+    }
+
+    const leaf = this.app.workspace.getLeaf("tab");
+    await leaf.openFile(this.app.vault.getAbstractFileByPath(filePath) as import("obsidian").TFile);
   }
 
   // ── 마감 임박 뷰 ──────────────────────────────────────────────────────────
