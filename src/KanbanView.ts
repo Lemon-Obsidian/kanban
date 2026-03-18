@@ -249,6 +249,49 @@ class RenameColumnModal extends Modal {
   onClose() { this.contentEl.empty(); }
 }
 
+// ── WipLimitModal ─────────────────────────────────────────────────────────
+
+class WipLimitModal extends Modal {
+  private value: string;
+
+  constructor(
+    app: Parameters<typeof Modal["prototype"]["constructor"]>[0],
+    private currentLimit: number | undefined,
+    private onSave: (limit: number | undefined) => void
+  ) {
+    super(app);
+    this.value = currentLimit ? String(currentLimit) : "";
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "WIP 리밋 설정" });
+    contentEl.createEl("p", { text: "컬럼에 허용할 최대 카드 수를 입력하세요. 비워두면 제한 없음.", cls: "kanban-modal-desc" });
+    let inputEl: HTMLInputElement;
+    new Setting(contentEl).setName("최대 카드 수").addText((t) => {
+      t.setPlaceholder("제한 없음").setValue(this.value).onChange((v) => (this.value = v));
+      inputEl = t.inputEl;
+      inputEl.type = "number";
+      inputEl.min = "1";
+      inputEl.style.width = "100%";
+      setTimeout(() => { inputEl.select(); }, 50);
+    });
+    const btnRow = contentEl.createDiv("kanban-modal-buttons");
+    btnRow.createEl("button", { text: "취소" }).addEventListener("click", () => this.close());
+    btnRow.createEl("button", { text: "저장", cls: "mod-cta" })
+      .addEventListener("click", () => this.submit());
+    contentEl.addEventListener("keydown", (e) => { if (e.key === "Enter") this.submit(); });
+  }
+
+  private submit() {
+    const n = parseInt(this.value, 10);
+    this.onSave(this.value.trim() === "" ? undefined : (n > 0 ? n : undefined));
+    this.close();
+  }
+
+  onClose() { this.contentEl.empty(); }
+}
+
 // ── KanbanView ────────────────────────────────────────────────────────────
 
 type ViewMode = "board" | "archive" | "upcoming";
@@ -640,6 +683,18 @@ export class KanbanView extends ItemView {
           }).open();
         })
       );
+      menu.addItem((item) =>
+        item.setTitle("WIP 리밋 설정").setIcon("gauge").onClick(() => {
+          const col = this.activeBoard.columns.find((c) => c.id === columnId);
+          if (!col) return;
+          new WipLimitModal(this.app, col.wipLimit, async (limit) => {
+            col.wipLimit = limit;
+            await this.saveSettings();
+            await this.refresh();
+            new Notice(limit ? `WIP 리밋이 ${limit}으로 설정되었습니다.` : "WIP 리밋이 해제되었습니다.");
+          }).open();
+        })
+      );
       menu.addSeparator();
       menu.addItem((item) =>
         item.setTitle("컬럼 삭제").setIcon("trash").onClick(async () => {
@@ -835,8 +890,21 @@ export class KanbanView extends ItemView {
       this.renderContentWithLinks(contentEl, preview, this.boardSearch);
     }
 
-    // 체크리스트 인터랙티브 렌더링
+    // 체크리스트 진행률 바 + 인터랙티브 렌더링
     if (checklistItems.length > 0) {
+      const checked = checklistItems.filter((i) => i.checked).length;
+      const total = checklistItems.length;
+      const isComplete = checked === total;
+      const clWrap = cardEl.createDiv("kanban-checklist-wrap");
+      clWrap.createSpan({
+        text: `☑ ${checked}/${total}`,
+        cls: `kanban-checklist-progress${isComplete ? " complete" : ""}`,
+      });
+      const bar = clWrap.createDiv("kanban-checklist-bar");
+      const fill = bar.createDiv("kanban-checklist-bar-fill");
+      fill.style.width = `${Math.round((checked / total) * 100)}%`;
+      if (isComplete) fill.addClass("complete");
+
       const checklistEl = cardEl.createDiv("kanban-card-checklist");
       for (let i = 0; i < checklistItems.length; i++) {
         const item = checklistItems[i];
