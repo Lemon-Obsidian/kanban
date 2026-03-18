@@ -1125,15 +1125,24 @@ export class KanbanView extends ItemView {
     }
 
     // Markdown 생성
+    const priorityLabel: Record<string, string> = { low: "낮음", high: "높음", asap: "ASAP" };
     const lines: string[] = [`# ${label}\n`];
     for (const [tag, groupCards] of groups) {
       lines.push(tag === NO_TAG ? `## (태그 없음)` : `## #${tag}`);
       for (const card of groupCards) {
-        lines.push(`- ${card.title}`);
-        const { text } = parseChecklist(card.content);
+        const meta: string[] = [];
+        if (card.priority && card.priority !== "medium") meta.push(`\`${priorityLabel[card.priority]}\``);
+        if (card.due) meta.push(`\`📅 ${card.due}\``);
+        lines.push(`- ${card.title}${meta.length ? " " + meta.join(" ") : ""}`);
+        const { text, items: checklistItems } = parseChecklist(card.content);
         if (text) {
-          const firstLine = text.split("\n")[0].trim();
-          if (firstLine) lines.push(`  ${firstLine}`);
+          for (const line of text.split("\n")) {
+            const trimmed = line.trim();
+            if (trimmed) lines.push(`  ${trimmed}`);
+          }
+        }
+        for (const item of checklistItems) {
+          lines.push(`  - [${item.checked ? "x" : " "}] ${item.text}`);
         }
       }
       lines.push("");
