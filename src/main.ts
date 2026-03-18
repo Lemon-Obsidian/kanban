@@ -292,6 +292,20 @@ class KanbanSettingTab extends PluginSettingTab {
         })
       );
 
+      colSetting.addText((text) => {
+        text.inputEl.type = "number";
+        text.inputEl.min = "0";
+        text.inputEl.style.width = "52px";
+        text.setPlaceholder("WIP").setTooltip("WIP 리밋 (0 = 제한 없음)");
+        text.setValue(col.wipLimit ? String(col.wipLimit) : "");
+        text.onChange(async (v) => {
+          const n = parseInt(v);
+          cols[i].wipLimit = (!v || isNaN(n) || n <= 0) ? undefined : n;
+          await this.plugin.saveSettings();
+          this.plugin.refreshAllViews();
+        });
+      });
+
       colSetting.addButton((btn) =>
         btn.setIcon("arrow-up").setTooltip("위로").setDisabled(i === 0).onClick(async () => {
           [cols[i - 1], cols[i]] = [cols[i], cols[i - 1]];

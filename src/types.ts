@@ -26,6 +26,7 @@ export interface KanbanColumn {
   id: string;        // subfolder name
   label: string;     // display name
   flushable?: boolean;
+  wipLimit?: number; // max cards in column (0 or undefined = no limit)
 }
 
 export interface KanbanBoard {

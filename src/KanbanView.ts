@@ -491,7 +491,7 @@ export class KanbanView extends ItemView {
     }
 
     for (const col of this.activeBoard.columns) {
-      this.renderColumn(this.boardColumnsEl, col.id, col.label, col.flushable ?? false);
+      this.renderColumn(this.boardColumnsEl, col.id, col.label, col.flushable ?? false, col.wipLimit);
     }
 
     const addColPlaceholder = this.boardColumnsEl.createDiv("kanban-add-column-placeholder");
@@ -541,7 +541,7 @@ export class KanbanView extends ItemView {
     }
   }
 
-  private renderColumn(parent: HTMLElement, columnId: string, label: string, flushable: boolean) {
+  private renderColumn(parent: HTMLElement, columnId: string, label: string, flushable: boolean, wipLimit?: number) {
     const allCards = this.getFilteredCards(columnId);
 
     const col = parent.createDiv("kanban-column");
@@ -590,7 +590,9 @@ export class KanbanView extends ItemView {
     dragHandle.addEventListener("mousedown", () => { col.draggable = true; });
     dragHandle.addEventListener("mouseup", () => { if (!this.draggedColumnId) col.draggable = false; });
     colHeaderLeft.createEl("h2", { text: label, cls: "kanban-column-title" });
-    colHeaderLeft.createDiv({ text: String(allCards.length), cls: "kanban-column-count" });
+    const countText = wipLimit ? `${allCards.length} / ${wipLimit}` : String(allCards.length);
+    const isOverWip = !!wipLimit && allCards.length > wipLimit;
+    colHeaderLeft.createDiv({ text: countText, cls: `kanban-column-count${isOverWip ? " wip-exceeded" : ""}` });
 
     const colHeaderRight = colHeader.createDiv("kanban-column-header-right");
 

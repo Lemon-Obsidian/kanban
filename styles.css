@@ -423,6 +423,11 @@
   flex-shrink: 0;
 }
 
+.kanban-column-count.wip-exceeded {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+}
+
 .kanban-column-header-right {
   display: flex;
   align-items: center;
