@@ -1296,6 +1296,14 @@
 
 /* ── 체크리스트 배지 ─────────────────────────────────────── */
 
+.kanban-checklist-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-self: center;
+  flex-shrink: 0;
+}
+
 .kanban-checklist-progress {
   font-size: 0.7em;
   padding: 1px 6px;
@@ -1303,14 +1311,31 @@
   background: var(--background-modifier-border);
   color: var(--text-faint);
   white-space: nowrap;
-  flex-shrink: 0;
-  align-self: center;
   font-weight: 600;
 }
 
 .kanban-checklist-progress.complete {
   background: rgba(46, 204, 113, 0.15);
   color: #2ecc71;
+}
+
+.kanban-checklist-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+  margin: 0 6px;
+}
+
+.kanban-checklist-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--text-faint);
+  transition: width 0.2s ease;
+}
+
+.kanban-checklist-bar-fill.complete {
+  background: #2ecc71;
 }
 
 /* ── 우선순위 점 (리스트 뷰) ─────────────────────────────── */

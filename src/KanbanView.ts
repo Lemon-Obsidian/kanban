@@ -1264,10 +1264,17 @@ export class KanbanView extends ItemView {
     const { items: checklistItems } = parseChecklist(card.content);
     if (checklistItems.length > 0) {
       const checked = checklistItems.filter((i) => i.checked).length;
-      metaRow.createSpan({
-        text: `☑ ${checked}/${checklistItems.length}`,
-        cls: `kanban-checklist-progress${checked === checklistItems.length ? " complete" : ""}`,
+      const total = checklistItems.length;
+      const isComplete = checked === total;
+      const clWrap = metaRow.createDiv("kanban-checklist-wrap");
+      clWrap.createSpan({
+        text: `☑ ${checked}/${total}`,
+        cls: `kanban-checklist-progress${isComplete ? " complete" : ""}`,
       });
+      const bar = clWrap.createDiv("kanban-checklist-bar");
+      const fill = bar.createDiv("kanban-checklist-bar-fill");
+      fill.style.width = `${Math.round((checked / total) * 100)}%`;
+      if (isComplete) fill.addClass("complete");
     }
 
     cardEl.addEventListener("click", () => {
