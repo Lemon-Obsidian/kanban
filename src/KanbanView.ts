@@ -884,9 +884,10 @@ export class KanbanView extends ItemView {
         for (const link of card.links) {
           const badge = linksEl.createEl("a", {
             cls: "kanban-link-badge",
-            text: link.name ?? this.shortenUrl(link.url),
             title: link.url,
           });
+          badge.appendChild(this.createFaviconImg(link.url));
+          badge.createSpan({ text: link.name ?? this.shortenUrl(link.url) });
           badge.addEventListener("click", (e) => { e.stopPropagation(); openLink(link.url); });
         }
       } else {
@@ -898,7 +899,7 @@ export class KanbanView extends ItemView {
         dropdown.style.display = "none";
         for (const link of card.links) {
           const item = dropdown.createDiv({ cls: "kanban-link-dropdown-item" });
-          item.createSpan({ text: "🔗", cls: "kanban-link-dropdown-icon" });
+          item.appendChild(this.createFaviconImg(link.url));
           item.createSpan({ text: link.name ?? this.shortenUrl(link.url), title: link.url, cls: "kanban-link-dropdown-label" });
           item.addEventListener("click", (e) => { e.stopPropagation(); openLink(link.url); });
         }
@@ -960,6 +961,19 @@ export class KanbanView extends ItemView {
     } catch {
       return url.slice(0, 20) + (url.length > 20 ? "…" : "");
     }
+  }
+
+  private createFaviconImg(url: string): HTMLImageElement {
+    const img = document.createElement("img");
+    img.className = "kanban-link-favicon";
+    try {
+      const hostname = new URL(url).hostname;
+      img.src = `https://www.google.com/s2/favicons?domain=${hostname}&sz=16`;
+    } catch {
+      img.style.display = "none";
+    }
+    img.addEventListener("error", () => { img.style.display = "none"; });
+    return img;
   }
 
   private get allExistingTags(): string[] {
