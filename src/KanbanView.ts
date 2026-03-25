@@ -1126,15 +1126,15 @@ export class KanbanView extends ItemView {
       return 0;
     };
 
-    const renderCard = (card: KanbanCard, lines: string[]) => {
+    const renderCard = (card: KanbanCard, lines: string[], showDate = false) => {
       const { text, items: checklistItems } = parseChecklist(card.content);
       const checked = checklistItems.filter((i) => i.checked).length;
       const total = checklistItems.length;
       const clBadge = total > 0 ? ` ☑ ${checked}/${total}` : "";
       const priBadge = card.priority && card.priority !== "medium" ? ` · ${PRIORITY_BADGE[card.priority]}` : "";
-      lines.push(`- **${card.title}**${priBadge}${clBadge}`);
+      const dateBadge = showDate && card.mtime ? ` · ${new Date(card.mtime).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })}` : "";
+      lines.push(`- **${card.title}**${priBadge}${clBadge}${dateBadge}`);
       if (card.due) lines.push(`  - 📅 ${card.due}까지`);
-      if (card.tags.length > 0) lines.push(`  - ${card.tags.map((t) => `#${t}`).join(" ")}`);
       if (text) {
         for (const line of text.split("\n")) {
           const trimmed = line.trim();
@@ -1151,18 +1151,20 @@ export class KanbanView extends ItemView {
 
     const isDone = columnId === "done";
     if (isDone) {
-      // done: mtime 기준 월별 그룹 (최신순), 그룹 내 우선순위 정렬
+      // done: 태그(프로젝트)별 그룹 + 그룹 내 mtime 시간순 정렬
       const groups = new Map<string, KanbanCard[]>();
-      for (const card of [...cards].sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0))) {
-        const d = new Date(card.mtime ?? card.created);
-        const key = `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+      const NO_TAG = "\x00";
+      for (const card of [...cards].sort((a, b) =>
+        (a.tags[0] ?? "\uffff").localeCompare(b.tags[0] ?? "\uffff", "ko")
+      )) {
+        const key = card.tags[0] ?? NO_TAG;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(card);
       }
-      for (const [month, groupCards] of groups) {
-        lines.push(`## ${month} (${groupCards.length}건)\n`);
-        for (const card of [...groupCards].sort(sortByPriorityThenDue)) {
-          renderCard(card, lines);
+      for (const [tag, groupCards] of groups) {
+        lines.push(tag === NO_TAG ? `## (태그 없음) (${groupCards.length}건)\n` : `## #${tag} (${groupCards.length}건)\n`);
+        for (const card of [...groupCards].sort((a, b) => (a.mtime ?? 0) - (b.mtime ?? 0))) {
+          renderCard(card, lines, true);
         }
         lines.push("");
       }
