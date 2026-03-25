@@ -1113,39 +1113,85 @@ export class KanbanView extends ItemView {
   private async openColumnMarkdown(columnId: string, label: string) {
     const cards = this.cards.filter((c) => c.status === columnId);
 
-    // 첫 번째 태그 기준으로 그룹핑
-    const groups = new Map<string, KanbanCard[]>();
-    const NO_TAG = "\x00";
-    for (const card of [...cards].sort((a, b) =>
-      (a.tags[0] ?? "\uffff").localeCompare(b.tags[0] ?? "\uffff", "ko")
-    )) {
-      const key = card.tags[0] ?? NO_TAG;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(card);
-    }
+    const PRIORITY_ORDER: Record<string, number> = { asap: 0, high: 1, medium: 2, low: 3 };
+    const PRIORITY_BADGE: Record<string, string> = { asap: "🔴 ASAP", high: "🟠 높음", low: "🔵 낮음" };
 
-    // Markdown 생성
-    const priorityLabel: Record<string, string> = { low: "낮음", high: "높음", asap: "ASAP" };
-    const lines: string[] = [`# ${label}\n`];
-    for (const [tag, groupCards] of groups) {
-      lines.push(tag === NO_TAG ? `## (태그 없음)` : `## #${tag}`);
-      for (const card of groupCards) {
-        lines.push(`- ${card.title}`);
-        if (card.priority && card.priority !== "medium") lines.push(`  * 우선순위 ${priorityLabel[card.priority]}`);
-        if (card.due) lines.push(`  * 마감일 ${card.due}`);
-        const { text, items: checklistItems } = parseChecklist(card.content);
-        if (text) {
-          for (const line of text.split("\n")) {
-            const trimmed = line.trim();
-            if (trimmed) lines.push(`  ${trimmed}`);
-          }
-        }
-        for (const item of checklistItems) {
-          lines.push(`  - [${item.checked ? "x" : " "}] ${item.text}`);
+    const sortByPriorityThenDue = (a: KanbanCard, b: KanbanCard) => {
+      const pa = PRIORITY_ORDER[a.priority ?? "medium"] ?? 2;
+      const pb = PRIORITY_ORDER[b.priority ?? "medium"] ?? 2;
+      if (pa !== pb) return pa - pb;
+      if (a.due && b.due) return a.due.localeCompare(b.due);
+      if (a.due) return -1;
+      if (b.due) return 1;
+      return 0;
+    };
+
+    const renderCard = (card: KanbanCard, lines: string[]) => {
+      const { text, items: checklistItems } = parseChecklist(card.content);
+      const checked = checklistItems.filter((i) => i.checked).length;
+      const total = checklistItems.length;
+      const clBadge = total > 0 ? ` ☑ ${checked}/${total}` : "";
+      const priBadge = card.priority && card.priority !== "medium" ? ` · ${PRIORITY_BADGE[card.priority]}` : "";
+      lines.push(`- **${card.title}**${priBadge}${clBadge}`);
+      if (card.due) lines.push(`  - 📅 ${card.due}까지`);
+      if (card.tags.length > 0) lines.push(`  - ${card.tags.map((t) => `#${t}`).join(" ")}`);
+      if (text) {
+        for (const line of text.split("\n")) {
+          const trimmed = line.trim();
+          if (trimmed) lines.push(`  - ${trimmed}`);
         }
       }
-      lines.push("");
+      for (const item of checklistItems) {
+        lines.push(`  - [${item.checked ? "x" : " "}] ${item.text}`);
+      }
+    };
+
+    // Markdown 생성
+    const lines: string[] = [`# ${label}\n`];
+
+    const isDone = columnId === "done";
+    if (isDone) {
+      // done: mtime 기준 월별 그룹 (최신순), 그룹 내 우선순위 정렬
+      const groups = new Map<string, KanbanCard[]>();
+      for (const card of [...cards].sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0))) {
+        const d = new Date(card.mtime ?? card.created);
+        const key = `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(card);
+      }
+      for (const [month, groupCards] of groups) {
+        lines.push(`## ${month} (${groupCards.length}건)\n`);
+        for (const card of [...groupCards].sort(sortByPriorityThenDue)) {
+          renderCard(card, lines);
+        }
+        lines.push("");
+      }
+    } else {
+      // 그 외: 우선순위별 그룹, 그룹 내 마감일 정렬
+      const PRIORITY_GROUPS = [
+        { key: "asap",   label: "🔴 ASAP" },
+        { key: "high",   label: "🟠 높음" },
+        { key: "medium", label: "⚪ 보통" },
+        { key: "low",    label: "🔵 낮음" },
+      ];
+      for (const { key, label: groupLabel } of PRIORITY_GROUPS) {
+        const groupCards = cards
+          .filter((c) => (c.priority ?? "medium") === key)
+          .sort((a, b) => {
+            if (a.due && b.due) return a.due.localeCompare(b.due);
+            if (a.due) return -1;
+            if (b.due) return 1;
+            return 0;
+          });
+        if (groupCards.length === 0) continue;
+        lines.push(`## ${groupLabel} (${groupCards.length}건)\n`);
+        for (const card of groupCards) {
+          renderCard(card, lines);
+        }
+        lines.push("");
+      }
     }
+
     const content = lines.join("\n");
 
     // 임시 파일 생성/덮어쓰기 후 열기
