@@ -6,7 +6,7 @@ import {
   PluginSettingTab,
   Setting,
 } from "obsidian";
-import { DEFAULT_BOARD, DEFAULT_SETTINGS, KanbanBoard, KanbanColumn, KanbanSettings } from "./types";
+import { DEFAULT_BOARD, DEFAULT_SETTINGS, KanbanBoard, KanbanSettings } from "./types";
 import { FileManager } from "./FileManager";
 import { KanbanView, VIEW_TYPE_KANBAN } from "./KanbanView";
 import { TagGroupView, VIEW_TYPE_TAG_GROUP } from "./TagGroupView";
@@ -126,8 +126,6 @@ export default class KanbanPlugin extends Plugin {
 }
 
 class KanbanSettingTab extends PluginSettingTab {
-  // per-board state for the "add column" form
-  private newColState = new Map<string, { name: string; flushable: boolean }>();
   private newDayValue = "";
   private newBoardName = "";
   private newBoardFolder = "";
@@ -274,113 +272,6 @@ class KanbanSettingTab extends PluginSettingTab {
         });
       });
 
-    // 컬럼 목록
-    section.createEl("p", { text: "컬럼", cls: "kanban-settings-cols-label" });
-
-    const cols = board.columns;
-    for (let i = 0; i < cols.length; i++) {
-      const col = cols[i];
-      const colSetting = new Setting(section)
-        .setName(`컬럼 ${i + 1}`)
-        .setDesc(`폴더: ${col.id}`);
-
-      colSetting.addText((text) => {
-        text.setValue(col.label).onChange((v) => { cols[i].label = v.trim() || col.id; });
-        text.inputEl.addEventListener("blur", async () => {
-          const newLabel = cols[i].label;
-          const newId = slugify(newLabel) || col.id;
-          if (newId !== col.id) {
-            const conflict = cols.some((c, j) => j !== i && c.id === newId);
-            if (conflict) {
-              new Notice(`"${newId}" 폴더가 이미 존재합니다.`);
-              cols[i].label = col.label;
-              text.setValue(col.label);
-              return;
-            }
-            await this.plugin.fileManager.renameColumn(col.id, newId);
-            cols[i].id = newId;
-          }
-          await this.plugin.saveSettings();
-          this.plugin.refreshAllViews();
-          this.display();
-        });
-      });
-
-      colSetting.addToggle((toggle) =>
-        toggle.setTooltip("보관 가능").setValue(col.flushable ?? false).onChange(async (v) => {
-          cols[i].flushable = v;
-          await this.plugin.saveSettings();
-          this.plugin.refreshAllViews();
-        })
-      );
-
-      colSetting.addText((text) => {
-        text.inputEl.type = "number";
-        text.inputEl.min = "0";
-        text.inputEl.style.width = "52px";
-        text.setPlaceholder("WIP").setTooltip("WIP 리밋 (0 = 제한 없음)");
-        text.setValue(col.wipLimit ? String(col.wipLimit) : "");
-        text.onChange(async (v) => {
-          const n = parseInt(v);
-          cols[i].wipLimit = (!v || isNaN(n) || n <= 0) ? undefined : n;
-          await this.plugin.saveSettings();
-          this.plugin.refreshAllViews();
-        });
-      });
-
-      colSetting.addButton((btn) =>
-        btn.setIcon("arrow-up").setTooltip("위로").setDisabled(i === 0).onClick(async () => {
-          [cols[i - 1], cols[i]] = [cols[i], cols[i - 1]];
-          await this.plugin.saveSettings();
-          this.plugin.refreshAllViews();
-          this.display();
-        })
-      );
-
-      colSetting.addButton((btn) =>
-        btn.setIcon("arrow-down").setTooltip("아래로").setDisabled(i === cols.length - 1).onClick(async () => {
-          [cols[i], cols[i + 1]] = [cols[i + 1], cols[i]];
-          await this.plugin.saveSettings();
-          this.plugin.refreshAllViews();
-          this.display();
-        })
-      );
-
-      colSetting.addButton((btn) =>
-        btn.setIcon("trash").setTooltip("컬럼 삭제").onClick(async () => {
-          if (cols.length <= 1) { new Notice("최소 1개의 컬럼이 필요합니다."); return; }
-          const cards = await this.plugin.fileManager.loadCards(col.id);
-          const cardCount = cards.length;
-          const message = cardCount > 0
-            ? `"${col.label}" 컬럼과 카드 ${cardCount}개가 모두 삭제됩니다. 계속하시겠습니까?`
-            : `"${col.label}" 컬럼을 삭제할까요?`;
-          new SettingConfirmModal(this.app, {
-            title: "컬럼 삭제", message, confirmText: "삭제",
-            onConfirm: async () => {
-              await this.plugin.fileManager.deleteColumn(col.id);
-              cols.splice(i, 1);
-              await this.plugin.saveSettings();
-              this.plugin.refreshAllViews();
-              this.display();
-            },
-          }).open();
-        })
-      );
-    }
-
-    // 새 컬럼 추가
-    const state = this.newColState.get(board.id) ?? { name: "", flushable: false };
-    this.newColState.set(board.id, state);
-
-    new Setting(section)
-      .setName("컬럼 추가")
-      .addText((text) => {
-        text.setPlaceholder("컬럼 이름").setValue(state.name).onChange((v) => (state.name = v));
-        text.inputEl.addEventListener("keydown", (e) => { if (e.key === "Enter") this.addColumn(board); });
-      })
-      .addToggle((t) => t.setTooltip("보관 가능").setValue(state.flushable).onChange((v) => (state.flushable = v)))
-      .addButton((btn) => btn.setButtonText("추가").setCta().onClick(() => this.addColumn(board)));
-
     // 보드 삭제
     if (this.plugin.settings.boards.length > 1) {
       new Setting(section)
@@ -456,30 +347,6 @@ class KanbanSettingTab extends PluginSettingTab {
     new Notice(`${n}일이 추가되었습니다.`);
   }
 
-  private async addColumn(board: KanbanBoard) {
-    const state = this.newColState.get(board.id);
-    const name = state?.name.trim() ?? "";
-    if (!name) { new Notice("컬럼 이름을 입력하세요."); return; }
-
-    const existingIds = board.columns.map((c) => c.id);
-    let id = slugify(name) || `col-${Date.now()}`;
-    if (existingIds.includes(id)) {
-      let n = 2;
-      while (existingIds.includes(`${id}-${n}`)) n++;
-      id = `${id}-${n}`;
-    }
-
-    const newCol: KanbanColumn = { id, label: name, flushable: state?.flushable ?? false };
-    board.columns.push(newCol);
-    await this.plugin.saveSettings();
-    this.plugin.fileManager.setBoard(board);
-    await this.plugin.fileManager.ensureFolders();
-    this.plugin.fileManager.setBoard(this.plugin.activeBoard);
-    this.plugin.refreshAllViews();
-    if (state) { state.name = ""; state.flushable = false; }
-    this.display();
-    new Notice(`"${name}" 컬럼이 추가되었습니다.`);
-  }
 }
 
 class SettingConfirmModal extends Modal {

@@ -6,7 +6,7 @@
 
 멀티 보드 · 해시태그 필터링 · 우선순위 · WIP 리밋 · 체크리스트 · 외부 링크 · 반복 작업 스케줄러 · 키보드 단축키 · 아카이브
 
-[![Release](https://img.shields.io/badge/release-2.0.13-6c63ff?style=flat-square)](https://github.com/Lemon-Obsidian/kanban/releases/latest)
+[![Release](https://img.shields.io/badge/release-2.0.25-6c63ff?style=flat-square)](https://github.com/Lemon-Obsidian/kanban/releases/latest)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.0%2B-7c3aed?style=flat-square&logo=obsidian&logoColor=white)](https://obsidian.md)
 [![License](https://img.shields.io/github/license/Lemon-Obsidian/kanban?style=flat-square&color=10b981)](LICENSE)
 
@@ -318,10 +318,10 @@ created: 2026-01-01T10:00:00.000Z
 
 | 동작 | 방법 |
 |------|------|
-| 추가 | 보드 오른쪽 `+ 컬럼 추가` 또는 설정 탭 |
+| 추가 | 보드 오른쪽 `+ 컬럼 추가` |
 | 이름 변경 | 컬럼 헤더 hover → `···` → 이름 변경 (폴더명 자동 리네임) |
 | 삭제 | `···` → 컬럼 삭제 (카드가 있으면 삭제 불가) |
-| 순서 변경 | 컬럼 헤더 드래그 또는 설정 탭 ↑/↓ 버튼 |
+| 순서 변경 | 컬럼 헤더 드래그 |
 
 ### 보관 & 아카이브
 
@@ -344,7 +344,6 @@ created: 2026-01-01T10:00:00.000Z
 | 항목 | 설명 | 기본값 |
 |------|------|--------|
 | 보드 이름 / 폴더 | 보드별 이름과 카드 저장 경로 | — |
-| 컬럼 관리 | 컬럼 추가 · 삭제 · 순서 변경 · Flush 가능 여부 | — |
 | 마감 임박 기간 | 마감 임박 뷰 필터 버튼에 표시할 기간 (일 단위) | 1, 7, 30 |
 
 ---
@@ -380,6 +379,7 @@ manifest.json        # 플러그인 메타 (id: lemon-kanban)
 
 | 버전 | 주요 변경 |
 |------|-----------|
+| **2.0.25** | 설정 탭에서 컬럼 관리 섹션 제거 — 보드 뷰에서 통합 관리 |
 | **2.0.14** | Dataview 호환 — frontmatter에 `status` 필드 추가 및 기존 카드 마이그레이션 버튼 |
 | **2.0.13** | 태그 필터 다중 선택 OR 로직 지원 |
 | **2.0.12** | WIP 리밋 — 컬럼별 최대 카드 수 설정 및 초과 경고 |

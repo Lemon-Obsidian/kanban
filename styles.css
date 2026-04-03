@@ -143,15 +143,6 @@
   color: white;
 }
 
-.kanban-settings-cols-label {
-  font-size: 0.78em;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  margin: 12px 0 4px;
-}
-
 .kanban-header-btn {
   display: flex;
   align-items: center;
