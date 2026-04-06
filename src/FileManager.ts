@@ -10,10 +10,16 @@ import { ArchivedCard, CardLink, KanbanBoard, KanbanCard } from "./types";
 import { slugify } from "./utils";
 
 export class FileManager {
+  private cardCache = new Map<string, { mtime: number; card: KanbanCard }>();
+
   constructor(private app: App, private board: KanbanBoard) {}
 
   setBoard(board: KanbanBoard) {
     this.board = board;
+  }
+
+  clearCache() {
+    this.cardCache.clear();
   }
 
   private getColumnPath(columnId: string): string {
@@ -124,22 +130,32 @@ export class FileManager {
     const ids = columnId
       ? [columnId]
       : this.board.columns.map((c) => c.id);
-    const cards: KanbanCard[] = [];
 
+    const fileEntries: { file: TFile; columnId: string }[] = [];
     for (const id of ids) {
       const folder = this.app.vault.getAbstractFileByPath(
         this.getColumnPath(id)
       );
       if (!(folder instanceof TFolder)) continue;
-
       for (const child of folder.children) {
         if (!(child instanceof TFile) || child.extension !== "md") continue;
-        const raw = await this.app.vault.read(child);
-        const card = this.parseFileContent(child.path, raw, id);
-        card.mtime = child.stat.mtime;
-        cards.push(card);
+        fileEntries.push({ file: child, columnId: id });
       }
     }
+
+    const cards = await Promise.all(
+      fileEntries.map(async ({ file, columnId: colId }) => {
+        const cached = this.cardCache.get(file.path);
+        if (cached && cached.mtime === file.stat.mtime) {
+          return { ...cached.card, status: colId };
+        }
+        const raw = await this.app.vault.read(file);
+        const card = this.parseFileContent(file.path, raw, colId);
+        card.mtime = file.stat.mtime;
+        this.cardCache.set(file.path, { mtime: file.stat.mtime, card });
+        return card;
+      })
+    );
 
     return cards.sort(
       (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
@@ -166,6 +182,7 @@ export class FileManager {
   async updateCard(card: KanbanCard): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(card.filePath);
     if (!(file instanceof TFile)) return;
+    this.cardCache.delete(card.filePath);
     await this.app.vault.modify(file, this.buildFileContent(card));
   }
 
@@ -188,12 +205,14 @@ export class FileManager {
       newPath = normalizePath(`${newFolder}/${base}-${counter++}.md`);
     }
 
+    this.cardCache.delete(card.filePath);
     await this.app.vault.rename(file, newPath);
   }
 
   async deleteCard(card: KanbanCard): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(card.filePath);
     if (!(file instanceof TFile)) return;
+    this.cardCache.delete(card.filePath);
     await this.app.vault.trash(file, true);
   }
 
@@ -275,22 +294,27 @@ export class FileManager {
     );
     if (!(archiveFolder instanceof TFolder)) return [];
 
-    const cards: ArchivedCard[] = [];
-
+    const files: TFile[] = [];
     for (const monthFolder of archiveFolder.children) {
       if (!(monthFolder instanceof TFolder)) continue;
-
       for (const child of monthFolder.children) {
         if (!(child instanceof TFile) || child.extension !== "md") continue;
-        const raw = await this.app.vault.read(child);
-        const card = this.parseArchivedCard(child.path, raw);
-        if (card) cards.push(card);
+        files.push(child);
       }
     }
 
-    return cards.sort(
-      (a, b) => new Date(b.flushedAt).getTime() - new Date(a.flushedAt).getTime()
+    const results = await Promise.all(
+      files.map(async (child) => {
+        const raw = await this.app.vault.read(child);
+        return this.parseArchivedCard(child.path, raw);
+      })
     );
+
+    return results
+      .filter((card): card is ArchivedCard => card !== null)
+      .sort(
+        (a, b) => new Date(b.flushedAt).getTime() - new Date(a.flushedAt).getTime()
+      );
   }
 
   private parseArchivedCard(filePath: string, raw: string): ArchivedCard | null {
